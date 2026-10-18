@@ -105,6 +105,11 @@ clang++ -std=c++17 -fsyntax-only -Wall -Wextra \
   следить: `gh run watch`, артефакт: `gh run download <id>`.
 - Первый зелёный CI с новыми редакторами: run `39147131759` (коммит
   `483e0a7`, 2026-10-18); локальная копия APK — `~/GoldSrcMaker0.0.1-alpha.apk`.
+- CI с компиляторами: run `39154916117` (коммит `1a3c47c`) — успех, APK
+  (2,2 МБ) с libhl*/libcxx_vhlt внутри `lib/arm64-v8a/`; проверено: бинарники
+  из APK прогоняют полный цикл CSG→BSP→VIS→RAD на warzone (BSP 115 КБ,
+  без error/leak). `useLegacyPackaging=true` + `extractNativeLibs=true` уже
+  включены — библиотеки распаковываются в nativeLibraryDir (exec разрешён).
 - **Военный проект-пример `warzone`** (локально, не закоммичен): `GenWar`
   сгенерировал карту (44 браша, 46 энтити: HECU-солдаты, штурмовик-ассасин
   «boss», союзник Барни, РПГ/MP5/дробовик, огонь, мешки с песком, бункер),
