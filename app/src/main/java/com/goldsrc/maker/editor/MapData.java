@@ -20,6 +20,7 @@ public class MapData {
         StringBuilder builder = new StringBuilder();
         builder.append("{\n");
         builder.append("\"classname\" \"worldspawn\"\n");
+        builder.append("\"mapversion\" \"220\"\n");
         String wadValue = sanitize(wadAbsolutePath);
         if (extraWadAbsolutePath != null && !extraWadAbsolutePath.isEmpty()) {
             wadValue = wadValue + ";" + sanitize(extraWadAbsolutePath);

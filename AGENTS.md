@@ -71,6 +71,10 @@ clang++ -std=c++17 -fsyntax-only -Wall -Wextra \
 - `app/src/main/cpp/vulkan_renderer.cpp` — Vulkan: swapchain, depth, pipeline
 - `app/src/main/cpp/native_bridge.cpp` — fork/exec стадий компиляции
 - `tools/selftest/run.sh` — селфтест, лог диалога `docs/SESSION_LOG.md`
+- `tools/warmap/run.sh` (GenWar.java) — генератор проекта-примера `warzone`
+  («войнушка»): карта, textures.wad, модели, скрипт-граф; пишет прямо в
+  `Documents/GoldSrcMaker/projects/warzone` и проверяет результат обратной
+  загрузкой
 
 ## Статус на 2026-10-18
 
@@ -101,6 +105,33 @@ clang++ -std=c++17 -fsyntax-only -Wall -Wextra \
   следить: `gh run watch`, артефакт: `gh run download <id>`.
 - Первый зелёный CI с новыми редакторами: run `39147131759` (коммит
   `483e0a7`, 2026-10-18); локальная копия APK — `~/GoldSrcMaker0.0.1-alpha.apk`.
+- **Военный проект-пример `warzone`** (локально, не закоммичен): `GenWar`
+  сгенерировал карту (44 браша, 46 энтити: HECU-солдаты, штурмовик-ассасин
+  «boss», союзник Барни, РПГ/MP5/дробовик, огонь, мешки с песком, бункер),
+  8 процедурных текстур в `textures.wad`, 2 модели, скрипт-граф с сообщениями;
+  `halflife.wad` скопирован в `Documents/GoldSrcMaker/valve/`. Проверки
+  генератора и селфтест — зелёные. EntityCatalog пополнен военными классами
+  (HECU, оружие, патроны, env_fire).
+- **Компиляция карт работает на arm64 (полный цикл)**: VHLT собран в Termux
+  (~/goldsrc-tools/vhlt), результат — `app/src/main/jniLibs/arm64-v8a/`
+  `libhlcsg.so|libhlbsp.so|libhlvis.so|libhlrad.so` + `libcxx_vhlt.so` (копия
+  Termux libc++_shared с `patchelf --set-soname libcxx_vhlt.so`). Ключевые
+  детали: бинарники — **исполняемые PIE** (`make`, интерпретатор
+  /system/bin/linker64), НЕ `-shared` (иначе SIGILL на устройстве); после
+  `cp` — `patchelf --replace-needed libc++_shared.so libcxx_vhlt.so` и
+  `patchelf --remove-rpath`. CI-скрипт (Makefile в vhlt): `make bin/hlcsg` и т.п.
+  Полный цикл CSG→BSP→VIS→RAD на warzone: все exit=0, BSP ~115 КБ со
+  светокартами, без LEAK.
+- Исправлены 2 блокера компиляции (без них .map не компилировался вообще):
+  (1) `Brush.appendFace` писал точки в порядке, дающем нормали ВНУТРЬ браша →
+  hlcsg считал браши пустыми; порядок исправлен (свап 2-й/3-й точек),
+  MapExportTest проверяет нормали по конвенции qbsp `(A-B)×(C-B)` наружу;
+  (2) VHLT `hlrad/compress.h` — UB-сдвиг `>> (1+max-exp)` до 128 ломал
+  compat-тест на clang/arm64; добавлен `bitshift_positive` (s<24 ? x>>s : 0),
+  значения совпали с эталонными (x86) — патч локальный, при обновлении VHLT
+  повторить.
+- `MapCompiler` при компиляции копирует `textures.wad` проекта в `valve/`
+  (движок ищет WAD по имени из worldspawn относительно gamedir).
 
 ## Что делать дальше (идеи)
 
@@ -112,7 +143,9 @@ clang++ -std=c++17 -fsyntax-only -Wall -Wextra \
   `.bsp`, свободная камера.
 - Модели: несколько текстур/групп в .mdl, `env_sprite`-спрайты, анимация
   (несколько кадров) — сейчас только статика.
-- Компиляторы: собрать порты VHLT под arm64 и положить в `jniLibs/` —
-  единственный путь, гарантированно обходящий W^X.
+- Компиляторы: ✅ порты VHLT под arm64 в `jniLibs/` (см. Статус) — путь,
+  обходящий W^X. Решение о лицензии (GPL): публиковать ли бинарники в
+  репозитории — за пользователем; при публикации добавить NOTICE со ссылкой
+  на исходники VHLT и список локальных патчей.
 - Проверка лаунчера и редакторов на живом устройстве/эмуляторе с Xash3D FWGS.
 - EntityCatalog: больше классов/полей; brush-энтити (func_door, trigger_*).

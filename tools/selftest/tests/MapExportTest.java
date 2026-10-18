@@ -58,8 +58,8 @@ public class MapExportTest {
             int cy = Integer.parseInt(matcher.group(8));
             int cz = Integer.parseInt(matcher.group(9));
 
-            int ux = bx - ax, uy = by - ay, uz = bz - az;
-            int vx = cx - ax, vy = cy - ay, vz = cz - az;
+            int ux = ax - bx, uy = ay - by, uz = az - bz;
+            int vx = cx - bx, vy = cy - by, vz = cz - bz;
             int nx = uy * vz - uz * vy;
             int ny = uz * vx - ux * vz;
             int nz = ux * vy - uy * vx;

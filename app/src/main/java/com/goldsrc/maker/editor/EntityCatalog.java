@@ -102,6 +102,42 @@ public final class EntityCatalog {
         register("monster_zombie", "NPC: зомби", new ClassDef("Враждебный NPC-зомби.")
                 .field("targetname", "Имя (targetname)")
                 .field("target", "Цель (target)"));
+
+        register("monster_human_grunt", "NPC: солдат HECU", new ClassDef("Враждебный солдат HECU: стреляет из MP5 или дробовика, кидает гранаты.")
+                .number("weapons", "Оружие (1=MP5, 2=дробовик, 3=оба)")
+                .def("weapons", "1"));
+
+        register("monster_human_assassin", "NPC: ассасин HECU", new ClassDef("Элитный боец HECU: быстрая, прыгает, стреляет с двух рук.")
+                .number("weapons", "Оружие (оставьте -1)")
+                .def("weapons", "-1"));
+
+        register("monster_barney", "NPC: Барни (союзник)", new ClassDef("Дружественный охранник: воюет на стороне игрока.")
+                .number("weapons", "Оружие (0=пистолет)")
+                .def("weapons", "0"));
+
+        register("env_fire", "Огонь", new ClassDef("Очаг огня (костёр, горящие обломки).")
+                .number("firesize", "Размер очага")
+                .number("firehealth", "Запас горения")
+                .def("firesize", "64")
+                .def("firehealth", "1000000"));
+
+        addItemLike("item_suit", "Костюм HEV", "Подбираемый костюм HEV (нужен для брони).");
+        addItemLike("weapon_9mmhandgun", "Оружие: пистолет", "Подбираемый пистолет 9мм.");
+        addItemLike("weapon_9mmAR", "Оружие: MP5", "Подбираемый автомат MP5 (и гранатомёт под стволом).");
+        addItemLike("weapon_shotgun", "Оружие: дробовик", "Подбираемый дробовик.");
+        addItemLike("weapon_rpg", "Оружие: РПГ", "Подбираемая ракетница.");
+        addItemLike("weapon_handgrenade", "Оружие: гранаты", "Подбираемые ручные гранаты.");
+        addItemLike("ammo_9mmclip", "Припасы: 9мм", "Патроны для пистолета и MP5.");
+        addItemLike("ammo_9mmAR", "Припасы: MP5", "Магазины для MP5.");
+        addItemLike("ammo_ARgrenades", "Припасы: гранаты MP5", "Подствольные гранаты MP5.");
+        addItemLike("ammo_buckshot", "Припасы: дробь", "Патроны для дробовика.");
+        addItemLike("ammo_rpgclip", "Припасы: ракеты", "Ракеты для РПГ.");
+    }
+
+    private static void addItemLike(String classname, String title, String help) {
+        register(classname, title, new ClassDef(help)
+                .number("spawnflags", "Флаги появления")
+                .def("spawnflags", "0"));
     }
 
     private static void register(String classname, String title, ClassDef def) {

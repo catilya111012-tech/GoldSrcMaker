@@ -138,6 +138,13 @@ public final class MapCompiler {
         File installed = new File(mapsDir, project.getName() + ".bsp");
         copyFile(bsp, installed);
 
+        String projectWad = ProjectManager.projectWadPath(project);
+        if (projectWad != null) {
+            File wadTarget = new File(valveDir, "textures.wad");
+            copyFile(new File(projectWad), wadTarget);
+            log.append("\nТекстуры проекта установлены: ").append(wadTarget.getAbsolutePath());
+        }
+
         log.append("\nГотово:\n  ").append(output.getAbsolutePath())
                 .append("\n  ").append(installed.getAbsolutePath())
                 .append("\n\nЗапустите игру кнопкой «Запустить игру» - карта уже в вашем valve/maps.");

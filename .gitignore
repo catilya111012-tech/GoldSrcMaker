@@ -8,5 +8,10 @@ captures/
 .externalNativeBuild/
 .cxx/
 app/src/main/jniLibs/**/*.so
+!app/src/main/jniLibs/arm64-v8a/libhlcsg.so
+!app/src/main/jniLibs/arm64-v8a/libhlbsp.so
+!app/src/main/jniLibs/arm64-v8a/libhlvis.so
+!app/src/main/jniLibs/arm64-v8a/libhlrad.so
+!app/src/main/jniLibs/arm64-v8a/libcxx_vhlt.so
 app/src/main/cpp/shaders/*.spv
 tools/selftest/build/

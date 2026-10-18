@@ -66,7 +66,7 @@ public class Brush {
                             String uAxis, String vAxis) {
         builder.append(String.format(Locale.US,
                 "( %d %d %d ) ( %d %d %d ) ( %d %d %d ) %s %s %s 0 1 1\n",
-                ax, ay, az, bx, by, bz, cx, cy, cz, texture, uAxis, vAxis));
+                ax, ay, az, cx, cy, cz, bx, by, bz, texture, uAxis, vAxis));
     }
 
     public JSONObject toJson() throws JSONException {
