@@ -153,3 +153,9 @@ commit/push.
 ветку `backup/local-before-sync-20261018`, `main` привёл к origin, вернул
 рабочий `build.yml` пользователя, пин NDK выровнял на 25.2.9519653,
 закоммитил все накопленные изменения и запушил; запускаю CI.
+
+**Ассистент (продолжение):** push выполнен (`483e0a7`), CI «Build APK»
+(workflow_dispatch) прошёл успешно — run `39147131759`; APK
+`GoldSrcMaker0.0.1-alpha.apk` с нативными `libgoldsrc_native.so` (arm64-v8a,
+armeabi-v7a, x86_64) скачан в `~/GoldSrcMaker0.0.1-alpha.apk`. Ответ
+пользователю: изменения в origin, CI зелёный, APK готов.

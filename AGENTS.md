@@ -99,6 +99,8 @@ clang++ -std=c++17 -fsyntax-only -Wall -Wextra \
   Gradle 8.9 через `gradle/gradle-build-action@v3`; `./gradlew` в репозитории
   есть, но CI не использует. Запуск вручную: `gh workflow run build.yml`,
   следить: `gh run watch`, артефакт: `gh run download <id>`.
+- Первый зелёный CI с новыми редакторами: run `39147131759` (коммит
+  `483e0a7`, 2026-10-18); локальная копия APK — `~/GoldSrcMaker0.0.1-alpha.apk`.
 
 ## Что делать дальше (идеи)
 
