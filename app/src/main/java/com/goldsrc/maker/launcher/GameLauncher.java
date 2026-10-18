@@ -2,6 +2,7 @@ package com.goldsrc.maker.launcher;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.AppOpsManager;
 import android.content.ActivityNotFoundException;
 import android.content.ComponentName;
 import android.content.Context;
@@ -9,6 +10,7 @@ import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.os.Build;
 
 import java.io.File;
 import java.io.IOException;
@@ -21,6 +23,7 @@ public final class GameLauncher {
         public final Intent intent;
         public final String fatalError;
         public final List<String> warnings = new ArrayList<>();
+        public String enginePackage;
 
         private LaunchPlan(Intent intent, String fatalError) {
             this.intent = intent;
@@ -117,10 +120,18 @@ public final class GameLauncher {
         }
 
         LaunchPlan plan = new LaunchPlan(buildLaunchIntent(packageName, activityName, workingRoot, mapName), null);
+        plan.enginePackage = packageName;
 
         if (!new File(valveDir, "pak0.pak").isFile()) {
             plan.warnings.add("Не найден pak0.pak: меню, спрайты, звуки и модели вашей игры "
                     + "могут не загрузиться. Скопируйте его в " + valveDir.getAbsolutePath());
+        }
+        if (!engineHasAllFilesAccess(context, packageName)) {
+            plan.warnings.add("У движка Xash3D нет разрешения «Доступ ко всем файлам» — "
+                    + "без него движок не увидит файлы игры. Выдайте его: Настройки → "
+                    + "Приложения → Xash3D → Разрешения → «Файлы и медиа» → "
+                    + "«Разрешить управление всеми файлами» (на Samsung: Настройки → "
+                    + "Приложения → ⋮ «Специальный доступ» → «Управление всеми файлами»).");
         }
         if (isPrivateStorage(context, workingRoot)) {
             plan.warnings.add("Рабочая папка находится в приватном хранилище приложения. "
@@ -138,6 +149,27 @@ public final class GameLauncher {
         intent.putExtra("gamedir", GAME_DIR_NAME);
         intent.putExtra("argv", "-log +map " + mapName);
         return intent;
+    }
+
+    public static boolean engineHasAllFilesAccess(Context context, String packageName) {
+        try {
+            AppOpsManager ops = (AppOpsManager) context.getSystemService(Context.APP_OPS_SERVICE);
+            if (ops == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+                return true;
+            }
+            int uid = context.getPackageManager().getApplicationInfo(packageName, 0).uid;
+            int mode;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                mode = ops.unsafeCheckOpNoThrow(
+                        AppOpsManager.OPSTR_MANAGE_EXTERNAL_STORAGE, uid, packageName);
+            } else {
+                mode = ops.checkOpNoThrow(
+                        AppOpsManager.OPSTR_MANAGE_EXTERNAL_STORAGE, uid, packageName);
+            }
+            return mode == AppOpsManager.MODE_ALLOWED;
+        } catch (Exception ignored) {
+            return true;
+        }
     }
 
     public static boolean isPrivateStorage(Context context, File workingRoot) {
@@ -185,15 +217,33 @@ public final class GameLauncher {
             for (String warning : plan.warnings) {
                 message.append("• ").append(warning).append("\n\n");
             }
-            new AlertDialog.Builder(activity)
+            AlertDialog.Builder builder = new AlertDialog.Builder(activity)
                     .setTitle("Запуск с предупреждениями")
                     .setMessage(message.toString().trim())
                     .setPositiveButton("Всё равно запустить", (dialog, which) -> doLaunch(activity, plan))
-                    .setNegativeButton("Отмена", null)
-                    .show();
+                    .setNegativeButton("Отмена", null);
+            if (plan.enginePackage != null) {
+                builder.setNeutralButton("Настройки Xash3D", (dialog, which) -> openEngineSettings(activity, plan.enginePackage));
+            }
+            builder.show();
             return;
         }
         doLaunch(activity, plan);
+    }
+
+    private static void openEngineSettings(Activity activity, String packageName) {
+        try {
+            Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+            intent.setData(android.net.Uri.parse("package:" + packageName));
+            activity.startActivity(intent);
+        } catch (ActivityNotFoundException e) {
+            new AlertDialog.Builder(activity)
+                    .setTitle("Настройки Xash3D")
+                    .setMessage("Откройте: Настройки → Приложения → Xash3D → Разрешения → "
+                            + "«Файлы и медиа» → «Разрешить управление всеми файлами».")
+                    .setPositiveButton("ОК", null)
+                    .show();
+        }
     }
 
     private static void doLaunch(Activity activity, LaunchPlan plan) {
