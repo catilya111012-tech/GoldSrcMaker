@@ -30,6 +30,8 @@ public class VulkanSurfaceView extends SurfaceView implements SurfaceHolder.Call
     private final Handler handler = new Handler(Looper.getMainLooper());
     private boolean rendererActive = false;
     private StatusListener statusListener;
+    private float[] pendingGeometry;
+    private int geometryVertices = -1;
 
     private final Runnable frameLoop = new Runnable() {
         @Override
@@ -58,6 +60,21 @@ public class VulkanSurfaceView extends SurfaceView implements SurfaceHolder.Call
         this.statusListener = listener;
     }
 
+    public void setGeometry(float[] vertices) {
+        pendingGeometry = vertices;
+        geometryVertices = vertices == null ? -1 : vertices.length / GeometryBuilder.FLOATS_PER_VERTEX;
+        if (rendererActive && LIBRARY_LOADED) {
+            try {
+                nativeSetGeometry(vertices);
+            } catch (UnsatisfiedLinkError ignored) {
+            }
+        }
+    }
+
+    public int getGeometryVertices() {
+        return geometryVertices;
+    }
+
     @Override
     public void surfaceCreated(SurfaceHolder holder) {
         if (!LIBRARY_LOADED) {
@@ -68,6 +85,9 @@ public class VulkanSurfaceView extends SurfaceView implements SurfaceHolder.Call
             nativeSurfaceCreated(holder.getSurface());
             rendererActive = true;
             notifyStatus("Vulkan: " + nativeRendererInfo());
+            if (pendingGeometry != null) {
+                nativeSetGeometry(pendingGeometry);
+            }
             handler.post(frameLoop);
         } catch (Throwable t) {
             notifyStatus("Vulkan init error: " + t.getMessage());
@@ -109,6 +129,8 @@ public class VulkanSurfaceView extends SurfaceView implements SurfaceHolder.Call
     private native void nativeSurfaceChanged(int width, int height);
 
     private native void nativeDrawFrame();
+
+    private native void nativeSetGeometry(float[] data);
 
     private native void nativeSurfaceDestroyed();
 

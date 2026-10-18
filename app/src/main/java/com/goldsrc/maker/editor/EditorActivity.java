@@ -26,6 +26,8 @@ import com.goldsrc.maker.compiler.MapCompiler;
 import com.goldsrc.maker.core.Project;
 import com.goldsrc.maker.core.ProjectManager;
 import com.goldsrc.maker.core.StorageManager;
+import com.goldsrc.maker.core.TextureImage;
+import com.goldsrc.maker.core.TextureStore;
 import com.goldsrc.maker.core.WadReader;
 import com.goldsrc.maker.launcher.GameLauncher;
 import com.goldsrc.maker.render.VulkanPreviewActivity;
@@ -37,27 +39,13 @@ import com.goldsrc.maker.scripting.HybridScriptEngine;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 public class EditorActivity extends Activity {
 
     public static final String EXTRA_PROJECT_NAME = "project_name";
-
-    private static final String[] ENTITY_CLASSES = {
-            "info_player_start",
-            "info_player_deathmatch",
-            "light",
-            "light_environment",
-            "info_target",
-            "ambient_generic",
-            "env_sprite",
-            "item_healthkit",
-            "item_battery",
-            "weapon_crowbar",
-            "monster_scientist",
-            "monster_zombie"
-    };
 
     private final Handler ui = new Handler(Looper.getMainLooper());
 
@@ -264,7 +252,7 @@ public class EditorActivity extends Activity {
                 chooseTexture();
             }
         });
-        entityClassButton = button("Энтити: " + ENTITY_CLASSES[0], new View.OnClickListener() {
+        entityClassButton = button("Энтити: " + EntityCatalog.classNames()[0], new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 chooseEntityClass();
@@ -374,6 +362,13 @@ public class EditorActivity extends Activity {
             @Override
             public void onMapChanged() {
                 updateStatus();
+            }
+        });
+
+        canvasView.setEntitySelectionListener(new BrushCanvasView.EntitySelectionListener() {
+            @Override
+            public void onEntitySelected(EntityData entity) {
+                showEntityProperties(entity);
             }
         });
 
@@ -554,6 +549,46 @@ public class EditorActivity extends Activity {
         });
         layout.addView(browse);
 
+        Button projectTextures = new Button(this);
+        projectTextures.setText("Текстуры проекта");
+        projectTextures.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                new Thread(() -> {
+                    try {
+                        final List<TextureImage> loaded =
+                                new TextureStore(project.getDir()).loadAll();
+                        final List<String> names = new ArrayList<>();
+                        for (TextureImage texture : loaded) {
+                            names.add(texture.name);
+                        }
+                        ui.post(() -> {
+                            if (names.isEmpty()) {
+                                toast("В проекте нет текстур — создайте их в редакторе текстур");
+                                return;
+                            }
+                            showTextureList(names, input);
+                        });
+                    } catch (final Exception e) {
+                        ui.post(() -> toast("Проект: " + e.getMessage()));
+                    }
+                }).start();
+            }
+        });
+        layout.addView(projectTextures);
+
+        Button openTextures = new Button(this);
+        openTextures.setText("Открыть редактор текстур");
+        openTextures.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Intent intent = new Intent(EditorActivity.this, TexturesActivity.class);
+                intent.putExtra(TexturesActivity.EXTRA_PROJECT_NAME, project.getName());
+                startActivity(intent);
+            }
+        });
+        layout.addView(openTextures);
+
         new AlertDialog.Builder(this)
                 .setTitle("Текстура брашей")
                 .setView(layout)
@@ -582,11 +617,155 @@ public class EditorActivity extends Activity {
     private void chooseEntityClass() {
         new AlertDialog.Builder(this)
                 .setTitle("Класс энтити")
-                .setItems(ENTITY_CLASSES, (dialog, which) -> {
-                    canvasView.setEntityClass(ENTITY_CLASSES[which]);
-                    entityClassButton.setText("Энтити: " + ENTITY_CLASSES[which]);
+                .setItems(EntityCatalog.classNames(), (dialog, which) -> {
+                    String classname = EntityCatalog.classNames()[which];
+                    canvasView.setEntityClass(classname);
+                    entityClassButton.setText("Энтити: " + classname);
                 })
                 .setNegativeButton("Отмена", null)
+                .show();
+    }
+
+    private void showEntityProperties(final EntityData entity) {
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(dp(18), dp(10), dp(18), dp(10));
+
+        TextView header = new TextView(this);
+        header.setText(EntityCatalog.title(entity.classname) + "  (" + entity.classname + ")");
+        header.setTextSize(16f);
+        header.setTextColor(0xFFECEFF1);
+        layout.addView(header);
+
+        TextView help = new TextView(this);
+        help.setText(EntityCatalog.help(entity.classname)
+                + "\norigin: " + entity.originX() + " " + entity.originY() + " " + entity.originZ()
+                + "\nПеренести энтити: перетащите её по карте.");
+        help.setTextSize(12f);
+        help.setTextColor(0xFF90A4AE);
+        layout.addView(help);
+
+        final List<EntityCatalog.FieldSpec> specs = EntityCatalog.fields(entity.classname);
+        final Map<String, EditText> inputs = new LinkedHashMap<>();
+        for (EntityCatalog.FieldSpec spec : specs) {
+            TextView label = new TextView(this);
+            label.setText(spec.label + "  [" + spec.key + "]");
+            label.setTextSize(13f);
+            label.setTextColor(0xFFB0BEC5);
+            layout.addView(label);
+
+            EditText input = new EditText(this);
+            String value = entity.getKey(spec.key);
+            input.setText(value == null ? "" : value);
+            if (spec.numeric) {
+                input.setInputType(InputType.TYPE_CLASS_NUMBER
+                        | InputType.TYPE_NUMBER_FLAG_DECIMAL
+                        | InputType.TYPE_NUMBER_FLAG_SIGNED);
+            }
+            inputs.put(spec.key, input);
+            layout.addView(input);
+        }
+
+        Button changeClass = new Button(this);
+        changeClass.setText("Сменить класс…");
+        changeClass.setOnClickListener(v -> {
+            if (!applyEntityInputs(entity, specs, inputs)) {
+                return;
+            }
+            new AlertDialog.Builder(this)
+                    .setTitle("Новый класс")
+                    .setItems(EntityCatalog.classNames(), (dialog, which) -> {
+                        String newClass = EntityCatalog.classNames()[which];
+                        entity.classname = newClass;
+                        for (Map.Entry<String, String> entry : EntityCatalog.defaults(newClass).entrySet()) {
+                            if (entity.getKey(entry.getKey()) == null) {
+                                entity.setKey(entry.getKey(), entry.getValue());
+                            }
+                        }
+                        canvasView.entityUpdated();
+                        showEntityProperties(entity);
+                    })
+                    .setNegativeButton("Отмена", null)
+                    .show();
+        });
+        layout.addView(changeClass);
+
+        Button addKey = new Button(this);
+        addKey.setText("Добавить свойство…");
+        addKey.setOnClickListener(v -> {
+            if (!applyEntityInputs(entity, specs, inputs)) {
+                return;
+            }
+            showAddKeyDialog(entity);
+        });
+        layout.addView(addKey);
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(layout);
+
+        new AlertDialog.Builder(this)
+                .setTitle("Свойства энтити")
+                .setView(scroll)
+                .setPositiveButton("Применить", (dialog, which) -> {
+                    if (applyEntityInputs(entity, specs, inputs)) {
+                        canvasView.entityUpdated();
+                    }
+                })
+                .setNeutralButton("Дублировать", (dialog, which) -> {
+                    canvasView.duplicateSelectedEntity();
+                    EntityData copy = canvasView.getSelectedEntity();
+                    if (copy != null) {
+                        showEntityProperties(copy);
+                    }
+                })
+                .setNegativeButton("Удалить", (dialog, which) ->
+                        canvasView.deleteSelectedEntity())
+                .show();
+    }
+
+    private boolean applyEntityInputs(EntityData entity, List<EntityCatalog.FieldSpec> specs,
+                                      Map<String, EditText> inputs) {
+        for (EntityCatalog.FieldSpec spec : specs) {
+            EditText input = inputs.get(spec.key);
+            if (input == null) {
+                continue;
+            }
+            String text = input.getText().toString().trim().replace(',', '.');
+            if (spec.numeric && !text.isEmpty() && !text.matches("-?[0-9]+(\\.[0-9]+)?")) {
+                toast("«" + spec.label + "» должно быть числом: " + text);
+                return false;
+            }
+            entity.setKey(spec.key, text.isEmpty() ? null : text);
+        }
+        return true;
+    }
+
+    private void showAddKeyDialog(final EntityData entity) {
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(dp(18), dp(10), dp(18), dp(10));
+
+        EditText keyInput = new EditText(this);
+        keyInput.setHint("ключ, напр. spawnflags");
+        EditText valueInput = new EditText(this);
+        valueInput.setHint("значение, напр. 1");
+        layout.addView(keyInput);
+        layout.addView(valueInput);
+
+        new AlertDialog.Builder(this)
+                .setTitle("Новое свойство")
+                .setView(layout)
+                .setPositiveButton("Добавить", (dialog, which) -> {
+                    String key = keyInput.getText().toString().trim();
+                    String value = valueInput.getText().toString().trim();
+                    if (key.isEmpty()) {
+                        return;
+                    }
+                    entity.setKey(key, value.isEmpty() ? null : value);
+                    canvasView.entityUpdated();
+                    showEntityProperties(entity);
+                })
+                .setNegativeButton("Отмена", (dialog, which) -> showEntityProperties(entity))
                 .show();
     }
 
@@ -635,7 +814,28 @@ public class EditorActivity extends Activity {
         new Thread(() -> {
             MapCompiler.Result result;
             try {
-                result = MapCompiler.compile(this, project, mapData, storage.findValveDir());
+                result = MapCompiler.compile(this, project, mapData, storage.findValveDir(),
+                        new MapCompiler.CompileListener() {
+                            @Override
+                            public void onStageStart(int stage, String stageName) {
+                                ui.post(() -> progress.setMessage(
+                                        "Этап " + (stage + 1) + "/4: " + stageName + "…"));
+                            }
+
+                            @Override
+                            public void onStageLog(int stage, String line) {
+                                final String trimmed = line.trim();
+                                if (trimmed.isEmpty()) {
+                                    return;
+                                }
+                                ui.post(() -> progress.setMessage(
+                                        "Этап " + MapCompiler.STAGE_NAMES[stage] + "…\n" + trimmed));
+                            }
+
+                            @Override
+                            public void onStageFinish(int stage, String stageName, int exitCode) {
+                            }
+                        });
             } catch (Exception e) {
                 result = MapCompiler.Result.failure("Исключение: " + e.getMessage());
             }
@@ -656,7 +856,10 @@ public class EditorActivity extends Activity {
 
         if (result.success && GameLauncher.isEngineInstalled(this)) {
             builder.setNeutralButton("Запустить игру", (dialog, which) -> {
-                GameLauncher.launch(EditorActivity.this, storage.getActiveRoot(), project.getName());
+                File valveDir = storage.findValveDir();
+                GameLauncher.LaunchPlan plan = GameLauncher.buildPlan(
+                        EditorActivity.this, valveDir.getParentFile(), project.getName());
+                GameLauncher.launchWithDialogs(EditorActivity.this, plan);
             });
         }
         builder.show();

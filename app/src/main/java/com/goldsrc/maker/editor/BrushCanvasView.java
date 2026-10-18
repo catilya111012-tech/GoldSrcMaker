@@ -13,6 +13,7 @@ import org.json.JSONObject;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.Map;
 
 public class BrushCanvasView extends View {
 
@@ -27,10 +28,16 @@ public class BrushCanvasView extends View {
         void onMapChanged();
     }
 
+    public interface EntitySelectionListener {
+        void onEntitySelected(EntityData entity);
+    }
+
     private static final int GRID_UNIT = 16;
     private static final int WALL_THICKNESS = 16;
     private static final int MIN_ROOM_SIZE = 32;
     private static final int UNDO_LIMIT = 40;
+    private static final float TAP_SLOP_PX = 16f;
+    private static final float HIT_RADIUS_PX = 44f;
 
     private static final int[] TEXTURE_PALETTE = {
             0xFF546E7A, 0xFF8D6E63, 0xFF789262, 0xFF7E57C2,
@@ -48,12 +55,14 @@ public class BrushCanvasView extends View {
     private final Paint brushStroke = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint entityPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint entityTextPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint selectionPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint previewPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final RectF rect = new RectF();
     private final Deque<String> undoStack = new ArrayDeque<>();
 
     private MapData mapData = new MapData();
     private MapChangeListener changeListener;
+    private EntitySelectionListener selectionListener;
 
     private Mode mode = Mode.WALL;
     private String texture = "NULL";
@@ -81,6 +90,15 @@ public class BrushCanvasView extends View {
     private float lastTouchX;
     private float lastTouchY;
 
+    private EntityData selectedEntity;
+    private EntityData draggingEntity;
+    private boolean dragPushedUndo;
+    private int dragStartOriginX;
+    private int dragStartOriginY;
+    private float downScreenX;
+    private float downScreenY;
+    private boolean tapCandidate;
+
     public BrushCanvasView(Context context) {
         super(context);
         init();
@@ -102,6 +120,10 @@ public class BrushCanvasView extends View {
         entityTextPaint.setColor(Color.WHITE);
         entityTextPaint.setTextSize(22f);
 
+        selectionPaint.setStyle(Paint.Style.STROKE);
+        selectionPaint.setStrokeWidth(4f);
+        selectionPaint.setColor(0xFFFFC107);
+
         previewPaint.setStyle(Paint.Style.STROKE);
         previewPaint.setStrokeWidth(4f);
         previewPaint.setColor(0xFFFFC107);
@@ -112,6 +134,8 @@ public class BrushCanvasView extends View {
     public void setMapData(MapData mapData) {
         this.mapData = mapData == null ? new MapData() : mapData;
         undoStack.clear();
+        selectedEntity = null;
+        draggingEntity = null;
         invalidate();
     }
 
@@ -121,6 +145,50 @@ public class BrushCanvasView extends View {
 
     public void setChangeListener(MapChangeListener listener) {
         this.changeListener = listener;
+    }
+
+    public void setEntitySelectionListener(EntitySelectionListener listener) {
+        this.selectionListener = listener;
+    }
+
+    public EntityData getSelectedEntity() {
+        return selectedEntity;
+    }
+
+    public void setSelectedEntity(EntityData entity) {
+        selectedEntity = entity;
+        invalidate();
+    }
+
+    public void deleteSelectedEntity() {
+        if (selectedEntity == null || !mapData.entities.contains(selectedEntity)) {
+            return;
+        }
+        pushUndo();
+        mapData.entities.remove(selectedEntity);
+        selectedEntity = null;
+        draggingEntity = null;
+        fireChanged();
+        invalidate();
+    }
+
+    public void duplicateSelectedEntity() {
+        if (selectedEntity == null || !mapData.entities.contains(selectedEntity)) {
+            return;
+        }
+        pushUndo();
+        EntityData copy = selectedEntity.copy();
+        copy.setOrigin(selectedEntity.originX() + 64, selectedEntity.originY() + 64,
+                selectedEntity.originZ());
+        mapData.entities.add(copy);
+        selectedEntity = copy;
+        fireChanged();
+        invalidate();
+    }
+
+    public void entityUpdated() {
+        fireChanged();
+        invalidate();
     }
 
     public void setMode(Mode mode) {
@@ -169,6 +237,8 @@ public class BrushCanvasView extends View {
         }
         try {
             mapData = MapData.fromJson(new JSONObject(undoStack.pop()));
+            selectedEntity = null;
+            draggingEntity = null;
         } catch (JSONException ignored) {
         }
         fireChanged();
@@ -285,6 +355,12 @@ public class BrushCanvasView extends View {
             canvas.drawText(entity.classname, screenX + 18f, screenY + 8f, entityTextPaint);
         }
 
+        if (selectedEntity != null && mapData.entities.contains(selectedEntity)) {
+            float screenX = worldToScreenX(selectedEntity.originX());
+            float screenY = worldToScreenY(selectedEntity.originY());
+            canvas.drawCircle(screenX, screenY, 20f, selectionPaint);
+        }
+
         if (drawing) {
             float left = worldToScreenX(Math.min(startWorldX, currentWorldX));
             float top = worldToScreenY(Math.min(startWorldY, currentWorldY));
@@ -299,16 +375,29 @@ public class BrushCanvasView extends View {
     public boolean onTouchEvent(MotionEvent event) {
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
+                downScreenX = event.getX();
+                downScreenY = event.getY();
+                tapCandidate = true;
                 if (mode == Mode.ERASE) {
                     erasing = true;
                     eraseAt(screenToWorldX(event.getX()), screenToWorldY(event.getY()));
                 } else {
-                    drawing = true;
-                    startWorldX = snap((int) screenToWorldX(event.getX()));
-                    startWorldY = snap((int) screenToWorldY(event.getY()));
-                    currentWorldX = startWorldX;
-                    currentWorldY = startWorldY;
-                    invalidate();
+                    EntityData hit = hitEntity(event.getX(), event.getY());
+                    if (hit != null) {
+                        selectedEntity = hit;
+                        draggingEntity = hit;
+                        dragPushedUndo = false;
+                        dragStartOriginX = hit.originX();
+                        dragStartOriginY = hit.originY();
+                        invalidate();
+                    } else {
+                        drawing = true;
+                        startWorldX = snap((int) screenToWorldX(event.getX()));
+                        startWorldY = snap((int) screenToWorldY(event.getY()));
+                        currentWorldX = startWorldX;
+                        currentWorldY = startWorldY;
+                        invalidate();
+                    }
                 }
                 lastTouchX = event.getX();
                 lastTouchY = event.getY();
@@ -318,6 +407,8 @@ public class BrushCanvasView extends View {
                 if (event.getPointerCount() >= 2) {
                     drawing = false;
                     erasing = false;
+                    draggingEntity = null;
+                    dragPushedUndo = false;
                     pinching = true;
                     pinchStartDistance = distance(event);
                     pinchStartScale = scale;
@@ -338,6 +429,22 @@ public class BrushCanvasView extends View {
                         offsetY = pinchFocusWorldY - pinchFocusScreenY / scale;
                         invalidate();
                     }
+                } else if (draggingEntity != null) {
+                    float dx = event.getX() - downScreenX;
+                    float dy = event.getY() - downScreenY;
+                    if (dx * dx + dy * dy > TAP_SLOP_PX * TAP_SLOP_PX) {
+                        tapCandidate = false;
+                    }
+                    if (!tapCandidate) {
+                        if (!dragPushedUndo) {
+                            pushUndo();
+                            dragPushedUndo = true;
+                        }
+                        int newX = snap((int) (dragStartOriginX + dx / scale));
+                        int newY = snap((int) (dragStartOriginY + dy / scale));
+                        draggingEntity.setOrigin(newX, newY, draggingEntity.originZ());
+                        invalidate();
+                    }
                 } else if (erasing) {
                     eraseAt(screenToWorldX(event.getX()), screenToWorldY(event.getY()));
                 } else if (drawing) {
@@ -345,8 +452,13 @@ public class BrushCanvasView extends View {
                     currentWorldY = snap((int) screenToWorldY(event.getY()));
                     invalidate();
                 } else {
-                    offsetX -= (event.getX() - lastTouchX) / scale;
-                    offsetY -= (event.getY() - lastTouchY) / scale;
+                    float panDx = event.getX() - lastTouchX;
+                    float panDy = event.getY() - lastTouchY;
+                    if (panDx * panDx + panDy * panDy > TAP_SLOP_PX * TAP_SLOP_PX) {
+                        tapCandidate = false;
+                    }
+                    offsetX -= panDx / scale;
+                    offsetY -= panDy / scale;
                     invalidate();
                 }
                 lastTouchX = event.getX();
@@ -354,9 +466,37 @@ public class BrushCanvasView extends View {
                 return true;
 
             case MotionEvent.ACTION_UP:
-                if (drawing) {
-                    finishDrawing();
+                float upDx = event.getX() - downScreenX;
+                float upDy = event.getY() - downScreenY;
+                boolean tap = tapCandidate && upDx * upDx + upDy * upDy <= TAP_SLOP_PX * TAP_SLOP_PX;
+
+                if (draggingEntity != null) {
+                    if (dragPushedUndo) {
+                        fireChanged();
+                    } else if (tap) {
+                        fireEntitySelected(draggingEntity);
+                    }
+                    draggingEntity = null;
+                    dragPushedUndo = false;
+                } else if (drawing) {
+                    if (tap) {
+                        if (mode == Mode.ENTITY) {
+                            createEntityAt((int) startWorldX, (int) startWorldY);
+                        } else {
+                            EntityData hit = hitEntity(event.getX(), event.getY());
+                            if (hit != null) {
+                                selectedEntity = hit;
+                                fireEntitySelected(hit);
+                            } else {
+                                selectedEntity = null;
+                            }
+                            invalidate();
+                        }
+                    } else {
+                        finishDrawing();
+                    }
                 }
+
                 drawing = false;
                 erasing = false;
                 pinching = false;
@@ -367,12 +507,47 @@ public class BrushCanvasView extends View {
                 drawing = false;
                 erasing = false;
                 pinching = false;
+                draggingEntity = null;
+                dragPushedUndo = false;
                 invalidate();
                 return true;
 
             default:
                 return super.onTouchEvent(event);
         }
+    }
+
+    private EntityData hitEntity(float screenX, float screenY) {
+        for (int i = mapData.entities.size() - 1; i >= 0; i--) {
+            EntityData entity = mapData.entities.get(i);
+            float entityX = worldToScreenX(entity.originX());
+            float entityY = worldToScreenY(entity.originY());
+            float dx = entityX - screenX;
+            float dy = entityY - screenY;
+            if (dx * dx + dy * dy <= HIT_RADIUS_PX * HIT_RADIUS_PX) {
+                return entity;
+            }
+        }
+        return null;
+    }
+
+    private void fireEntitySelected(EntityData entity) {
+        if (selectionListener != null) {
+            selectionListener.onEntitySelected(entity);
+        }
+    }
+
+    private void createEntityAt(int x, int y) {
+        pushUndo();
+        EntityData entity = new EntityData(entityClass);
+        for (Map.Entry<String, String> entry : EntityCatalog.defaults(entityClass).entrySet()) {
+            entity.setKey(entry.getKey(), entry.getValue());
+        }
+        entity.setOrigin(x, y, floorZ + 24);
+        mapData.entities.add(entity);
+        selectedEntity = entity;
+        fireEntitySelected(entity);
+        fireChanged();
     }
 
     private float distance(MotionEvent event) {
@@ -388,11 +563,7 @@ public class BrushCanvasView extends View {
         int y2 = snap((int) Math.max(startWorldY, currentWorldY));
 
         if (mode == Mode.ENTITY) {
-            pushUndo();
-            EntityData entity = new EntityData(entityClass);
-            entity.setOrigin(x1, y1, floorZ + 24);
-            mapData.entities.add(entity);
-            fireChanged();
+            createEntityAt(x1, y1);
             return;
         }
 
@@ -455,6 +626,12 @@ public class BrushCanvasView extends View {
             int dy = entity.originY() - wy;
             if (dx * dx + dy * dy <= 32 * 32) {
                 pushUndo();
+                if (entity == selectedEntity) {
+                    selectedEntity = null;
+                }
+                if (entity == draggingEntity) {
+                    draggingEntity = null;
+                }
                 mapData.entities.remove(i);
                 fireChanged();
                 invalidate();

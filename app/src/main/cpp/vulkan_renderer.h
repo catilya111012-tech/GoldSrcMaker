@@ -11,6 +11,7 @@
 bool vkrenderer_init(ANativeWindow* window);
 void vkrenderer_resize(int width, int height);
 void vkrenderer_draw_frame();
+void vkrenderer_set_geometry(const float* data, uint32_t floatCount);
 void vkrenderer_shutdown();
 const char* vkrenderer_device_name();
 

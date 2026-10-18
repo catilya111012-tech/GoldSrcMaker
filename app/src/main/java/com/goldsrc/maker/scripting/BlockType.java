@@ -23,6 +23,20 @@ public enum BlockType {
             new String[]{"trigger"},
             new String[]{"trigger_1"}),
 
+    ON_PLAYER_USE(
+            "Событие: игрок нажал объект (use)",
+            Kind.EVENT,
+            "on_player_use",
+            new String[]{"target"},
+            new String[]{"button_1"}),
+
+    ON_ENTITY_DEATH(
+            "Событие: объект уничтожен",
+            Kind.EVENT,
+            "on_entity_death",
+            new String[]{"target"},
+            new String[]{"monster_1"}),
+
     ACTION_SPAWN_ENTITY(
             "Действие: создать энтити",
             Kind.ACTION,
@@ -71,6 +85,34 @@ public enum BlockType {
             null,
             new String[]{"destination"},
             new String[]{"spawn_2"}),
+
+    ACTION_SET_VARIABLE(
+            "Действие: задать переменную",
+            Kind.ACTION,
+            null,
+            new String[]{"name", "value"},
+            new String[]{"counter", "1"}),
+
+    ACTION_DELAY(
+            "Действие: пауза (секунды)",
+            Kind.ACTION,
+            null,
+            new String[]{"seconds"},
+            new String[]{"1.0"}),
+
+    ACTION_SET_PLAYER_HEALTH(
+            "Действие: здоровье игрока",
+            Kind.ACTION,
+            null,
+            new String[]{"amount"},
+            new String[]{"100"}),
+
+    ACTION_CHANGE_LEVEL(
+            "Действие: сменить карту",
+            Kind.ACTION,
+            null,
+            new String[]{"map"},
+            new String[]{"map2"}),
 
     ACTION_END(
             "Действие: завершить цепочку",

@@ -17,6 +17,11 @@
         android:glEsVersion="0x00030000"
         android:required="false" />
 
+    <queries>
+        <package android:name="su.xash.engine" />
+        <package android:name="in.celest.xash3d.fwgs" />
+    </queries>
+
     <application
         android:allowBackup="false"
         android:extractNativeLibs="true"
@@ -38,6 +43,16 @@
 
         <activity
             android:name=".editor.EditorActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout"
+            android:exported="false" />
+
+        <activity
+            android:name=".editor.TexturesActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout"
+            android:exported="false" />
+
+        <activity
+            android:name=".editor.ModelEditorActivity"
             android:configChanges="orientation|screenSize|keyboardHidden|screenLayout"
             android:exported="false" />
 

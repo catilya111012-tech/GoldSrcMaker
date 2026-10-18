@@ -12,7 +12,11 @@ public class JSONObject {
     }
 
     public JSONObject(String text) throws JSONException {
-        throw new JSONException("stub: parsing not supported");
+        Object parsed = JsonParser.parse(text);
+        if (!(parsed instanceof JSONObject)) {
+            throw new JSONException("JSON верхнего уровня — не объект");
+        }
+        this.map.putAll(((JSONObject) parsed).map);
     }
 
     public JSONObject put(String key, Object value) {

@@ -12,8 +12,17 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.RandomAccessFile;
 
 public final class MapCompiler {
+
+    public interface CompileListener {
+        void onStageStart(int stage, String stageName);
+
+        void onStageLog(int stage, String line);
+
+        void onStageFinish(int stage, String stageName, int exitCode);
+    }
 
     public static final class Result {
         public final boolean success;
@@ -31,14 +40,22 @@ public final class MapCompiler {
         }
     }
 
-    private static final String[] STAGE_NAMES = {"HLCSG", "HLBSP", "HLVIS", "HLRAD"};
-    private static final String[] STAGE_BINARIES = {"hlcsg", "hlbsp", "hlvis", "hlrad"};
+    public static final String[] STAGE_NAMES = {"HLCSG", "HLBSP", "HLVIS", "HLRAD"};
+    public static final String[] STAGE_BINARIES = {"hlcsg", "hlbsp", "hlvis", "hlrad"};
+
     private static final int STAGE_LOG_LIMIT = 6000;
+    private static final long POLL_INTERVAL_MS = 200;
 
     private MapCompiler() {
     }
 
-    public static Result compile(Context context, Project project, MapData map, File valveDir) throws IOException {
+    public static Result compile(Context context, Project project, MapData map, File valveDir)
+            throws IOException {
+        return compile(context, project, map, valveDir, null);
+    }
+
+    public static Result compile(Context context, Project project, MapData map, File valveDir,
+                                 CompileListener listener) throws IOException {
         StringBuilder log = new StringBuilder();
 
         if (valveDir == null || !new File(valveDir, "halflife.wad").isFile()) {
@@ -53,12 +70,35 @@ public final class MapCompiler {
 
         File wadFile = new File(valveDir, "halflife.wad");
         File mapFile = new File(workDir, "main.map");
-        ProjectManager.writeText(mapFile, map.toMapText(wadFile.getAbsolutePath()));
-
-        String toolDir = context.getApplicationInfo().nativeLibraryDir;
+        ProjectManager.writeText(mapFile, map.toMapText(wadFile.getAbsolutePath(),
+                ProjectManager.projectWadPath(project)));
 
         for (int stage = 0; stage < STAGE_NAMES.length; stage++) {
-            int code = runStage(context, stage, toolDir, workDir);
+            File tool = CompilerToolchain.resolveTool(context, stage);
+            if (tool == null) {
+                log.append(buildMissingToolMessage(stage));
+                return Result.failure(log.toString());
+            }
+
+            if (listener != null) {
+                listener.onStageStart(stage, STAGE_NAMES[stage]);
+            }
+
+            File stageLogFile = new File(workDir, "compile_" + stage + ".log");
+            if (stageLogFile.exists() && !stageLogFile.delete()) {
+                log.append("Предупреждение: не удалось очистить журнал ").append(stageLogFile.getName()).append("\n");
+            }
+
+            LogPoller poller = new LogPoller(stageLogFile, stage, listener);
+            poller.start();
+
+            int code = runStage(tool, stage, workDir);
+            poller.stop();
+
+            if (listener != null) {
+                listener.onStageFinish(stage, STAGE_NAMES[stage], code);
+            }
+
             log.append(STAGE_NAMES[stage]).append(": exit=").append(code).append("\n");
 
             String stageLog = readStageLog(workDir, stage);
@@ -66,18 +106,14 @@ public final class MapCompiler {
                 log.append(stageLog).append("\n");
             }
 
-            if (code == CompilerNative.RESULT_MISSING_BINARY) {
-                log.append("\nНе найден мобильный порт компилятора lib")
-                        .append(STAGE_BINARIES[stage]).append(".so (").append(STAGE_NAMES[stage]).append(").\n")
-                        .append("Поместите собранные бинарники (VHLT / ericw-tools, лицензия GPL) в:\n")
-                        .append("app/src/main/jniLibs/arm64-v8a/lib")
-                        .append(STAGE_BINARIES[stage]).append(".so\n")
-                        .append("Приложение не распространяет их: это сторонние открытые утилиты.");
-                return Result.failure(log.toString());
-            }
-
             if (code != 0) {
                 log.append("\nЭтап ").append(STAGE_NAMES[stage]).append(" завершился с ошибкой.\n");
+                if (code == 127) {
+                    log.append("\nКод 127 обычно означает, что Android запретил запуск бинарника ")
+                            .append("из приватного хранилища приложения (ограничение W^X) или бинарник ")
+                            .append("собран под другую архитектуру. Соберите APK с компиляторами в jniLibs ")
+                            .append("под arm64-v8a.\n");
+                }
                 return Result.failure(log.toString());
             }
         }
@@ -108,26 +144,32 @@ public final class MapCompiler {
         return new Result(true, log.toString(), output);
     }
 
-    private static int runStage(Context context, int stage, String toolDir, File workDir) {
+    private static String buildMissingToolMessage(int stage) {
+        return "Не найден компилятор lib" + STAGE_BINARIES[stage] + ".so (" + STAGE_NAMES[stage] + ").\n\n"
+                + "Вариант 1: кнопка «Импорт компиляторов (SAF)» — выберите папку с бинарниками "
+                + "libhlcsg.so / libhlbsp.so / libhlvis.so / libhlrad.so.\n"
+                + "Вариант 2 (надёжный): разработчику положить их в app/src/main/jniLibs/arm64-v8a/ "
+                + "и пересобрать APK.\n\n"
+                + "Приложение не распространяет компиляторы: VHLT / ericw-tools — сторонние GPL-утилиты.";
+    }
+
+    private static int runStage(File tool, int stage, File workDir) {
         if (CompilerNative.isAvailable()) {
             try {
-                int code = CompilerNative.runStage(stage, toolDir, workDir.getAbsolutePath(), "main");
-                if (code != CompilerNative.RESULT_MISSING_BINARY) {
-                    return code;
-                }
+                int code = CompilerNative.runStage(stage,
+                        tool.getParentFile().getAbsolutePath(),
+                        workDir.getAbsolutePath(),
+                        "main");
+                return code;
             } catch (UnsatisfiedLinkError ignored) {
             }
         }
-        return runStageWithProcess(toolDir, stage, workDir);
+        return runStageWithProcess(tool, stage, workDir);
     }
 
-    private static int runStageWithProcess(String toolDir, int stage, File workDir) {
-        File binary = new File(toolDir, "lib" + STAGE_BINARIES[stage] + ".so");
-        if (!binary.isFile()) {
-            return CompilerNative.RESULT_MISSING_BINARY;
-        }
+    private static int runStageWithProcess(File tool, int stage, File workDir) {
         try {
-            ProcessBuilder builder = new ProcessBuilder(binary.getAbsolutePath(), "main");
+            ProcessBuilder builder = new ProcessBuilder(tool.getAbsolutePath(), "main");
             builder.directory(workDir);
             builder.redirectErrorStream(true);
             builder.redirectOutput(new File(workDir, "compile_" + stage + ".log"));
@@ -138,6 +180,81 @@ public final class MapCompiler {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return CompilerNative.RESULT_SPAWN_FAILED;
+        }
+    }
+
+    private static final class LogPoller {
+        private final File logFile;
+        private final int stage;
+        private final CompileListener listener;
+        private final Thread thread;
+        private volatile boolean running = true;
+        private long position = 0;
+
+        LogPoller(File logFile, int stage, CompileListener listener) {
+            this.logFile = logFile;
+            this.stage = stage;
+            this.listener = listener;
+            this.thread = new Thread(this::pollLoop);
+            this.thread.setDaemon(true);
+        }
+
+        void start() {
+            if (listener != null) {
+                thread.start();
+            }
+        }
+
+        void stop() {
+            running = false;
+            if (listener != null) {
+                try {
+                    thread.join(2000);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        }
+
+        private void pollLoop() {
+            while (running) {
+                drain();
+                try {
+                    Thread.sleep(POLL_INTERVAL_MS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
+            drain();
+        }
+
+        private void drain() {
+            if (!logFile.isFile()) {
+                return;
+            }
+            try (RandomAccessFile access = new RandomAccessFile(logFile, "r")) {
+                if (access.length() <= position) {
+                    return;
+                }
+                access.seek(position);
+                String line;
+                while ((line = access.readLine()) != null) {
+                    emit(line);
+                }
+                position = access.getFilePointer();
+            } catch (IOException ignored) {
+            }
+        }
+
+        private void emit(String line) {
+            if (listener == null) {
+                return;
+            }
+            try {
+                listener.onStageLog(stage, line);
+            } catch (RuntimeException ignored) {
+            }
         }
     }
 

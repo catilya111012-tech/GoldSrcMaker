@@ -26,6 +26,7 @@ public final class GameFileValidator {
     };
 
     private static final String[] RECOMMENDED_FILES = {
+            "pak0.pak",
             "liquids.wad",
             "xeno.wad",
             "decals.wad"

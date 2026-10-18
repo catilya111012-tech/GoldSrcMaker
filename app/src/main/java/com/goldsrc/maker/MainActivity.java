@@ -19,6 +19,7 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.goldsrc.maker.compiler.CompilerToolchain;
 import com.goldsrc.maker.compiler.MapCompiler;
 import com.goldsrc.maker.core.GameFileValidator;
 import com.goldsrc.maker.core.Project;
@@ -26,6 +27,8 @@ import com.goldsrc.maker.core.ProjectManager;
 import com.goldsrc.maker.core.StorageManager;
 import com.goldsrc.maker.editor.EditorActivity;
 import com.goldsrc.maker.editor.MapData;
+import com.goldsrc.maker.editor.ModelEditorActivity;
+import com.goldsrc.maker.editor.TexturesActivity;
 import com.goldsrc.maker.launcher.GameLauncher;
 import com.goldsrc.maker.scripting.HybridScriptEngine;
 
@@ -37,6 +40,7 @@ public class MainActivity extends Activity {
     private static final int REQ_MANAGE_STORAGE = 1001;
     private static final int REQ_LEGACY_STORAGE = 1002;
     private static final int REQ_SAF_TREE = 1003;
+    private static final int REQ_SAF_TOOLS = 1004;
 
     private final Handler ui = new Handler(Looper.getMainLooper());
 
@@ -77,6 +81,9 @@ public class MainActivity extends Activity {
         if (requestCode == REQ_SAF_TREE && resultCode == RESULT_OK && data != null && data.getData() != null) {
             storage.saveSafTreeUri(data.getData());
             importResourcesAsync();
+        } else if (requestCode == REQ_SAF_TOOLS && resultCode == RESULT_OK && data != null && data.getData() != null) {
+            storage.saveSafToolsTreeUri(data.getData());
+            importToolsAsync();
         } else if (requestCode == REQ_MANAGE_STORAGE) {
             refreshEnvironmentAsync();
         }
@@ -180,6 +187,37 @@ public class MainActivity extends Activity {
             @Override
             public void onClick(View v) {
                 pickSafTree();
+            }
+        });
+
+        addButton(root, R.string.action_import_tools, new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                pickSafToolsTree();
+            }
+        });
+
+        addButton(root, R.string.action_texture_editor, new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                pickProject(getString(R.string.action_texture_editor), new ProjectCallback() {
+                    @Override
+                    public void onProject(Project project) {
+                        openTextureEditor(project);
+                    }
+                });
+            }
+        });
+
+        addButton(root, R.string.action_model_editor, new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                pickProject(getString(R.string.action_model_editor), new ProjectCallback() {
+                    @Override
+                    public void onProject(Project project) {
+                        openModelEditor(project);
+                    }
+                });
             }
         });
 
@@ -315,6 +353,18 @@ public class MainActivity extends Activity {
         startActivity(intent);
     }
 
+    private void openTextureEditor(Project project) {
+        Intent intent = new Intent(this, TexturesActivity.class);
+        intent.putExtra(TexturesActivity.EXTRA_PROJECT_NAME, project.getName());
+        startActivity(intent);
+    }
+
+    private void openModelEditor(Project project) {
+        Intent intent = new Intent(this, ModelEditorActivity.class);
+        intent.putExtra(ModelEditorActivity.EXTRA_PROJECT_NAME, project.getName());
+        startActivity(intent);
+    }
+
     private void compileProject(final Project project) {
         if (busy) {
             return;
@@ -332,7 +382,28 @@ public class MainActivity extends Activity {
             MapCompiler.Result result;
             try {
                 MapData map = projects.loadMap(project);
-                result = MapCompiler.compile(this, project, map, storage.findValveDir());
+                result = MapCompiler.compile(this, project, map, storage.findValveDir(),
+                        new MapCompiler.CompileListener() {
+                            @Override
+                            public void onStageStart(int stage, String stageName) {
+                                ui.post(() -> progress.setMessage(
+                                        "Этап " + (stage + 1) + "/4: " + stageName + "…"));
+                            }
+
+                            @Override
+                            public void onStageLog(int stage, String line) {
+                                final String trimmed = line.trim();
+                                if (trimmed.isEmpty()) {
+                                    return;
+                                }
+                                ui.post(() -> progress.setMessage(
+                                        "Этап " + MapCompiler.STAGE_NAMES[stage] + "…\n" + trimmed));
+                            }
+
+                            @Override
+                            public void onStageFinish(int stage, String stageName, int exitCode) {
+                            }
+                        });
             } catch (final Exception e) {
                 result = MapCompiler.Result.failure("Исключение: " + e.getMessage());
             }
@@ -353,28 +424,20 @@ public class MainActivity extends Activity {
 
         if (result.success && GameLauncher.isEngineInstalled(this)) {
             builder.setNeutralButton(R.string.action_run_game, (dialog, which) ->
-                    GameLauncher.launch(this, storage.getActiveRoot(), project.getName()));
+                    runProject(project));
         }
         builder.show();
     }
 
-    private void runProject(Project project) {
-        File bsp = new File(new File(storage.findValveDir(), "maps"), project.getName() + ".bsp");
-        if (!bsp.isFile()) {
-            new AlertDialog.Builder(this)
-                    .setTitle("Карта не найдена")
-                    .setMessage("Сначала скомпилируйте карту:\n" + bsp.getAbsolutePath())
-                    .setPositiveButton("ОК", null)
-                    .show();
-            return;
-        }
+    private void runProject(final Project project) {
         if (!GameLauncher.isEngineInstalled(this)) {
             showEngineInstallDialog();
             return;
         }
-        if (!GameLauncher.launch(this, storage.getActiveRoot(), project.getName())) {
-            showEngineInstallDialog();
-        }
+        final File valveDir = storage.findValveDir();
+        final GameLauncher.LaunchPlan plan = GameLauncher.buildPlan(
+                this, valveDir.getParentFile(), project.getName());
+        GameLauncher.launchWithDialogs(this, plan);
     }
 
     private void showEngineInstallDialog() {
@@ -424,6 +487,51 @@ public class MainActivity extends Activity {
         } catch (ActivityNotFoundException e) {
             toast("Система не предоставила выбор папки (SAF)");
         }
+    }
+
+    private void pickSafToolsTree() {
+        try {
+            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                    | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+            startActivityForResult(intent, REQ_SAF_TOOLS);
+        } catch (ActivityNotFoundException e) {
+            toast("Система не предоставила выбор папки (SAF)");
+        }
+    }
+
+    private void importToolsAsync() {
+        final AlertDialog progress = new AlertDialog.Builder(this)
+                .setTitle("Импорт компиляторов")
+                .setMessage("Поиск libhlcsg.so / libhlbsp.so / libhlvis.so / libhlrad.so…")
+                .setCancelable(false)
+                .create();
+        progress.show();
+
+        new Thread(() -> {
+            try {
+                final int copied = storage.importSafToolsToPrivate();
+                final List<CompilerToolchain.ToolStatus> statuses = CompilerToolchain.probeAll(this);
+                ui.post(() -> {
+                    progress.dismiss();
+                    showToolchainReport(copied, statuses);
+                });
+            } catch (final Exception e) {
+                ui.post(() -> {
+                    progress.dismiss();
+                    toast("Ошибка импорта: " + e.getMessage());
+                });
+            }
+        }).start();
+    }
+
+    private void showToolchainReport(int copied, List<CompilerToolchain.ToolStatus> statuses) {
+        new AlertDialog.Builder(this)
+                .setTitle(copied > 0 ? "Импортировано файлов: " + copied : "Бинарники не найдены")
+                .setMessage(CompilerToolchain.describe(statuses))
+                .setPositiveButton(R.string.action_ok, null)
+                .show();
     }
 
     private void importResourcesAsync() {

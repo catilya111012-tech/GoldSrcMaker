@@ -14,7 +14,8 @@ public final class CodeGenerator {
             "// GoldSrc Mobile Game Maker - hybrid script\n" +
             "// API: gs_Event, gs_RunNext, gs_EndChain, gs_CheckCondition,\n" +
             "//      gs_SpawnEntity, gs_SetKeyValue, gs_GiveItem, gs_PlaySound,\n" +
-            "//      gs_UseTarget, gs_ShowMessage, gs_Teleport\n";
+            "//      gs_UseTarget, gs_ShowMessage, gs_Teleport, gs_SetVariable,\n" +
+            "//      gs_Delay, gs_SetPlayerHealth, gs_ChangeLevel\n";
 
     private static final Pattern REGION = Pattern.compile(
             "// >>> block:(\\d+)\\n(.*?)// <<< block:\\1\\n", Pattern.DOTALL);
@@ -42,6 +43,14 @@ public final class CodeGenerator {
             "^gs_ShowMessage\\(\"([^\"]*)\"\\);$");
     private static final Pattern P_TP = Pattern.compile(
             "^gs_Teleport\\(\"([^\"]*)\"\\);$");
+    private static final Pattern P_SETVAR = Pattern.compile(
+            "^gs_SetVariable\\(\"([^\"]*)\", \"([^\"]*)\"\\);$");
+    private static final Pattern P_DELAY = Pattern.compile(
+            "^gs_Delay\\(([0-9.]+)\\);$");
+    private static final Pattern P_HP = Pattern.compile(
+            "^gs_SetPlayerHealth\\((-?\\d+)\\);$");
+    private static final Pattern P_LEVEL = Pattern.compile(
+            "^gs_ChangeLevel\\(\"([^\"]*)\"\\);$");
 
     private static final int NO_NEXT = Integer.MIN_VALUE;
 
@@ -116,6 +125,12 @@ public final class CodeGenerator {
             case ON_TRIGGER_ENTER:
                 lines.add("gs_Event(\"on_trigger_enter\", " + quote(node.getParam("trigger")) + ");");
                 break;
+            case ON_PLAYER_USE:
+                lines.add("gs_Event(\"on_player_use\", " + quote(node.getParam("target")) + ");");
+                break;
+            case ON_ENTITY_DEATH:
+                lines.add("gs_Event(\"on_entity_death\", " + quote(node.getParam("target")) + ");");
+                break;
             case ACTION_SPAWN_ENTITY:
                 lines.add("gs_SpawnEntity(" + quote(node.getParam("classname")) + ", "
                         + quote(node.getParam("origin")) + ", "
@@ -142,6 +157,21 @@ public final class CodeGenerator {
                 break;
             case ACTION_TELEPORT:
                 lines.add("gs_Teleport(" + quote(node.getParam("destination")) + ");");
+                break;
+            case ACTION_SET_VARIABLE:
+                lines.add("gs_SetVariable(" + quote(node.getParam("name")) + ", "
+                        + quote(node.getParam("value")) + ");");
+                break;
+            case ACTION_DELAY:
+                lines.add("gs_Delay("
+                        + String.format(Locale.US, "%.2f", floatOrDefault(node.getParam("seconds"), 1.0f))
+                        + ");");
+                break;
+            case ACTION_SET_PLAYER_HEALTH:
+                lines.add("gs_SetPlayerHealth(" + intOrDefault(node.getParam("amount"), 100) + ");");
+                break;
+            case ACTION_CHANGE_LEVEL:
+                lines.add("gs_ChangeLevel(" + quote(node.getParam("map")) + ");");
                 break;
             case ACTION_END:
                 lines.add("gs_EndChain();");
@@ -280,7 +310,9 @@ public final class CodeGenerator {
             }
             region.type = type;
             if (eventMatcher.group(2) != null) {
-                if (type == BlockType.ON_PLAYER_TOUCH) {
+                if (type == BlockType.ON_PLAYER_TOUCH
+                        || type == BlockType.ON_PLAYER_USE
+                        || type == BlockType.ON_ENTITY_DEATH) {
                     region.params.put("target", eventMatcher.group(2));
                 } else if (type == BlockType.ON_TRIGGER_ENTER) {
                     region.params.put("trigger", eventMatcher.group(2));
@@ -394,6 +426,35 @@ public final class CodeGenerator {
         if (matcher.matches()) {
             region.type = BlockType.ACTION_TELEPORT;
             region.params.put("destination", matcher.group(1));
+            return true;
+        }
+
+        matcher = P_SETVAR.matcher(line);
+        if (matcher.matches()) {
+            region.type = BlockType.ACTION_SET_VARIABLE;
+            region.params.put("name", matcher.group(1));
+            region.params.put("value", matcher.group(2));
+            return true;
+        }
+
+        matcher = P_DELAY.matcher(line);
+        if (matcher.matches()) {
+            region.type = BlockType.ACTION_DELAY;
+            region.params.put("seconds", matcher.group(1));
+            return true;
+        }
+
+        matcher = P_HP.matcher(line);
+        if (matcher.matches()) {
+            region.type = BlockType.ACTION_SET_PLAYER_HEALTH;
+            region.params.put("amount", matcher.group(1));
+            return true;
+        }
+
+        matcher = P_LEVEL.matcher(line);
+        if (matcher.matches()) {
+            region.type = BlockType.ACTION_CHANGE_LEVEL;
+            region.params.put("map", matcher.group(1));
             return true;
         }
 

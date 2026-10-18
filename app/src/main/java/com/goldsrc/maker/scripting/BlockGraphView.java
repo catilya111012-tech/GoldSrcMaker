@@ -147,7 +147,14 @@ public class BlockGraphView extends View {
             canvas.drawRoundRect(rect, CORNER, CORNER, strokePaint);
 
             textPaint.setColor(Color.WHITE);
-            canvas.drawText(node.displayTitle(), left + 24f, top + 52f, textPaint);
+            String title = node.displayTitle();
+            float maxTitleWidth = NODE_WIDTH - 48f;
+            float titleWidth = textPaint.measureText(title);
+            if (titleWidth > maxTitleWidth) {
+                textPaint.setTextScaleX(maxTitleWidth / titleWidth);
+            }
+            canvas.drawText(title, left + 24f, top + 52f, textPaint);
+            textPaint.setTextScaleX(1f);
 
             float paramY = top + 90f;
             int shown = 0;

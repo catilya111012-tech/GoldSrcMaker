@@ -108,13 +108,17 @@ public class ProjectManager {
 
     public void saveMap(Project project, MapData map) throws IOException, JSONException {
         writeText(project.getMapJsonFile(), map.toJson().toString(2));
-        File wadFile = new File(storage.findValveDir(), "halflife.wad");
-        writeText(project.getMapFile(), map.toMapText(wadFile.getAbsolutePath()));
+        exportMapFile(project, map);
     }
 
     public void exportMapFile(Project project, MapData map) throws IOException {
         File wadFile = new File(storage.findValveDir(), "halflife.wad");
-        writeText(project.getMapFile(), map.toMapText(wadFile.getAbsolutePath()));
+        writeText(project.getMapFile(), map.toMapText(wadFile.getAbsolutePath(), projectWadPath(project)));
+    }
+
+    public static String projectWadPath(Project project) {
+        File projectWad = new TextureStore(project.getDir()).getWadFile();
+        return projectWad.isFile() ? projectWad.getAbsolutePath() : null;
     }
 
     private void validateName(String name) throws IOException {

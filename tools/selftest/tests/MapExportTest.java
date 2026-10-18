@@ -27,6 +27,13 @@ public class MapExportTest {
         check(text.contains("\"classname\" \"worldspawn\""), "worldspawn присутствует");
         check(text.contains("\"wad\" \"/storage/emulated/0/Documents/GoldSrcMaker/valve/halflife.wad\""),
                 "путь к WAD пользователя в worldspawn");
+
+        String combined = map.toMapText("/valve/halflife.wad", "/projects/demo/textures.wad");
+        check(combined.contains(
+                        "\"wad\" \"/valve/halflife.wad;/projects/demo/textures.wad\""),
+                "worldspawn поддерживает список WAD через ';'");
+        check(!map.toMapText("/valve/halflife.wad", null).contains(";"),
+                "без проектного WAD список не добавляется");
         check(text.contains("\"classname\" \"light\""), "point entity light присутствует");
         check(text.contains("\"light\" \"300\""), "keyvalue энтити присутствует");
         check(text.contains("C1A0_WX"), "текстура браша присутствует");

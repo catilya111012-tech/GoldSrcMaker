@@ -10,8 +10,6 @@ import org.json.JSONObject;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -156,110 +154,7 @@ public class HybridScriptEngine {
     }
 
     public List<String> simulate() {
-        List<String> log = new ArrayList<>();
-        Map<String, String> variables = new HashMap<>();
-        BlockNode start = graph.firstRoot();
-        if (start == null) {
-            log.add("Нет стартового события ON_MAP_START.");
-            return log;
-        }
-        executeChain(start.id, variables, log);
-        return log;
-    }
-
-    private void executeChain(int startId, Map<String, String> variables, List<String> log) {
-        int current = startId;
-        int guard = 0;
-        while (current >= 0 && guard++ < 512) {
-            BlockNode node = graph.findById(current);
-            if (node == null) {
-                return;
-            }
-
-            switch (node.type) {
-                case ON_MAP_START:
-                    log.add("[событие] старт карты");
-                    break;
-                case ON_PLAYER_TOUCH:
-                    log.add("[событие] игрок коснулся: " + node.getParam("target"));
-                    break;
-                case ON_TRIGGER_ENTER:
-                    log.add("[событие] вход в триггер: " + node.getParam("trigger"));
-                    break;
-                case ACTION_SPAWN_ENTITY:
-                    log.add("создать " + node.getParam("classname") + " в точке " + node.getParam("origin"));
-                    break;
-                case ACTION_SET_KEYVALUE:
-                    variables.put(node.getParam("target") + "." + node.getParam("key"), node.getParam("value"));
-                    log.add("задать " + node.getParam("target") + "." + node.getParam("key")
-                            + " = " + node.getParam("value"));
-                    break;
-                case ACTION_GIVE_ITEM:
-                    log.add("выдать " + node.getParam("item") + " x" + node.getParam("amount"));
-                    break;
-                case ACTION_PLAY_SOUND:
-                    log.add("звук " + node.getParam("sound") + " громкость " + node.getParam("volume"));
-                    break;
-                case ACTION_OPEN_DOOR:
-                    log.add("активировать " + node.getParam("target"));
-                    break;
-                case ACTION_SHOW_MESSAGE:
-                    log.add("сообщение: " + node.getParam("text"));
-                    break;
-                case ACTION_TELEPORT:
-                    log.add("телепорт к " + node.getParam("destination"));
-                    break;
-                case ACTION_END:
-                    log.add("конец цепочки");
-                    return;
-                case CONDITION_IF:
-                    String left = variables.containsKey(node.getParam("variable"))
-                            ? variables.get(node.getParam("variable"))
-                            : node.getParam("variable");
-                    boolean pass = evaluate(left, node.getParam("operator"), node.getParam("value"));
-                    log.add("условие " + node.getParam("variable") + " " + node.getParam("operator")
-                            + " " + node.getParam("value") + " -> " + (pass ? "истина" : "ложь"));
-                    if (!pass) {
-                        return;
-                    }
-                    break;
-                default:
-                    break;
-            }
-            current = node.nextId;
-        }
-    }
-
-    private static boolean evaluate(String left, String operator, String right) {
-        try {
-            double a = Double.parseDouble(left.trim());
-            double b = Double.parseDouble(right.trim());
-            switch (operator) {
-                case "==":
-                    return a == b;
-                case "!=":
-                    return a != b;
-                case ">":
-                    return a > b;
-                case "<":
-                    return a < b;
-                case ">=":
-                    return a >= b;
-                case "<=":
-                    return a <= b;
-                default:
-                    return false;
-            }
-        } catch (NumberFormatException ignored) {
-        }
-        switch (operator) {
-            case "==":
-                return left.equals(right);
-            case "!=":
-                return !left.equals(right);
-            default:
-                return false;
-        }
+        return ScriptSimulator.simulate(graph);
     }
 
     public void saveAll() throws IOException {

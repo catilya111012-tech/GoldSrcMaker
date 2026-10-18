@@ -13,10 +13,18 @@ public class MapData {
     public final List<EntityData> entities = new ArrayList<>();
 
     public String toMapText(String wadAbsolutePath) {
+        return toMapText(wadAbsolutePath, null);
+    }
+
+    public String toMapText(String wadAbsolutePath, String extraWadAbsolutePath) {
         StringBuilder builder = new StringBuilder();
         builder.append("{\n");
         builder.append("\"classname\" \"worldspawn\"\n");
-        builder.append("\"wad\" \"").append(sanitize(wadAbsolutePath)).append("\"\n");
+        String wadValue = sanitize(wadAbsolutePath);
+        if (extraWadAbsolutePath != null && !extraWadAbsolutePath.isEmpty()) {
+            wadValue = wadValue + ";" + sanitize(extraWadAbsolutePath);
+        }
+        builder.append("\"wad\" \"").append(wadValue).append("\"\n");
         for (Brush brush : brushes) {
             brush.appendMapText(builder);
         }

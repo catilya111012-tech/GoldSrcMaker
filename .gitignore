@@ -8,4 +8,5 @@ captures/
 .externalNativeBuild/
 .cxx/
 app/src/main/jniLibs/**/*.so
+app/src/main/cpp/shaders/*.spv
 tools/selftest/build/
