@@ -22,8 +22,10 @@
    `s < 24 ? x >> s : 0` (на x86 значения совпадают с эталонными).
 2. Сборка/постобработка: `make [USER_FLAGS=-fPIC] bin/hlrad`, затем
    `patchelf --replace-needed libc++_shared.so libcxx_vhlt.so` и
-   `patchelf --remove-rpath`. Бинарник остаётся исполняемым PIE — линковать
-   как `-shared` нельзя (на устройстве SIGILL).
+   `patchelf --set-rpath '$ORIGIN'` (при запуске из приложения нет
+   LD_LIBRARY_PATH — bionic-линкер находит libcxx_vhlt.so рядом с
+   бинарником только через $ORIGIN). Бинарник остаётся исполняемым PIE —
+   линковать как `-shared` нельзя (на устройстве SIGILL).
 
 Исходники VHLT доступны из апстрима (владелец прав — vluzacn); вместе с
 APK распространяются бинарные копии по правилам GPL.

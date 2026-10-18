@@ -178,6 +178,7 @@ public final class MapCompiler {
         try {
             ProcessBuilder builder = new ProcessBuilder(tool.getAbsolutePath(), "main");
             builder.directory(workDir);
+            builder.environment().put("LD_LIBRARY_PATH", tool.getParentFile().getAbsolutePath());
             builder.redirectErrorStream(true);
             builder.redirectOutput(new File(workDir, "compile_" + stage + ".log"));
             Process process = builder.start();
