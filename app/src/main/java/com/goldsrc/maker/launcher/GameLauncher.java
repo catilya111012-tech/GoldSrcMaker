@@ -158,13 +158,12 @@ public final class GameLauncher {
                 return true;
             }
             int uid = context.getPackageManager().getApplicationInfo(packageName, 0).uid;
+            String op = "android:manage_external_storage";
             int mode;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                mode = ops.unsafeCheckOpNoThrow(
-                        AppOpsManager.OPSTR_MANAGE_EXTERNAL_STORAGE, uid, packageName);
+                mode = ops.unsafeCheckOpNoThrow(op, uid, packageName);
             } else {
-                mode = ops.checkOpNoThrow(
-                        AppOpsManager.OPSTR_MANAGE_EXTERNAL_STORAGE, uid, packageName);
+                mode = ops.checkOpNoThrow(op, uid, packageName);
             }
             return mode == AppOpsManager.MODE_ALLOWED;
         } catch (Exception ignored) {
