@@ -66,7 +66,10 @@ clang++ -std=c++17 -fsyntax-only -Wall -Wextra \
 - `.../compiler/MapCompiler.java` + `CompilerToolchain.java` — пайплайн
   CSG→BSP→VIS→RAD, поиск/проверка запуска бинарников
 - `.../launcher/GameLauncher.java` — запуск `su.xash.engine.XashActivity`
-  с extras `basedir`/`gamedir`/`argv` (+ проверки)
+  с extras `basedir`/`gamedir`/`argv` (+ проверки); поддерживаемые пакеты:
+  `su.xash.engine`, `su.xash.engine.test` (сборки с trashbox/4pda),
+  `in.celest.xash3d.fwgs`. При добавлении пакетов — не забыть `<queries>`
+  в `AndroidManifest.xml` (иначе Android 11+ скрывает их от приложения)
 - `.../render/GeometryBuilder.java` — браши/энтити → вершинные данные
 - `app/src/main/cpp/vulkan_renderer.cpp` — Vulkan: swapchain, depth, pipeline
 - `app/src/main/cpp/native_bridge.cpp` — fork/exec стадий компиляции
