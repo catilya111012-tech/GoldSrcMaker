@@ -29,11 +29,13 @@ jobs:
           yes | sdkmanager --licenses
           sdkmanager "ndk;25.2.9519653" "cmake;3.22.1"
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
+      - name: Setup Gradle
+        uses: gradle/gradle-build-action@v3
+        with:
+          gradle-version: 8.2
 
       - name: Build with Gradle
-        run: ./gradlew assembleDebug
+        run: gradle assembleDebug
 
       - name: Rename APK
         run: mv app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/GoldSrcMaker0.0.1-alpha.apk
