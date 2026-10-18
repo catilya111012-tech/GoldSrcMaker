@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">GoldSrc Mobile Game Maker</string>
+
+    <string name="status_checking">Проверка игровых ресурсов…</string>
+    <string name="status_storage_mode_public">Режим: общий доступ к файлам разрешён</string>
+    <string name="status_storage_mode_private">Режим: приватное хранилище приложения (SAF-импорт)</string>
+
+    <string name="action_new_project">Новый проект</string>
+    <string name="action_open_editor">Открыть редактор</string>
+    <string name="action_compile_map">Скомпилировать карту</string>
+    <string name="action_run_game">Запустить игру</string>
+    <string name="action_grant_storage">Разрешить доступ к файлам</string>
+    <string name="action_import_resources">Импорт ресурсов (SAF)</string>
+    <string name="action_open_storage_settings">Открыть настройки доступа</string>
+    <string name="action_choose_project">Выберите проект</string>
+    <string name="action_create">Создать</string>
+    <string name="action_cancel">Отмена</string>
+    <string name="action_ok">ОК</string>
+
+    <string name="dialog_missing_title">Нет игровых ресурсов</string>
+    <string name="msg_missing_textures">Пожалуйста, скопируйте оригинальные файлы текстур со своего ПК отдельно.</string>
+    <string name="msg_editor_locked">Редактор заблокирован: не найдены обязательные файлы игровых ресурсов.</string>
+    <string name="msg_no_projects">Проектов пока нет. Создайте новый проект.</string>
+    <string name="msg_storage_required">Без доступа к файлам редактор не сможет читать WAD-текстуры и писать .bsp.</string>
+
+    <string name="entity_default">info_player_start</string>
+    <string name="tool_wall">Стена</string>
+    <string name="tool_room">Комната</string>
+    <string name="tool_entity">Энтити</string>
+    <string name="tool_erase">Ластик</string>
+</resources>
