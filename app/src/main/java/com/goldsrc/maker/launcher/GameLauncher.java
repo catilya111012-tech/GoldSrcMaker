@@ -34,6 +34,7 @@ public final class GameLauncher {
 
     private static final String[] ENGINE_PACKAGES = {
             "su.xash.engine",
+            "su.xash.engine.test",
             "in.celest.xash3d.fwgs"
     };
 

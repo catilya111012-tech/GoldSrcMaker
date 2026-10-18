@@ -19,6 +19,7 @@
 
     <queries>
         <package android:name="su.xash.engine" />
+        <package android:name="su.xash.engine.test" />
         <package android:name="in.celest.xash3d.fwgs" />
     </queries>
 
