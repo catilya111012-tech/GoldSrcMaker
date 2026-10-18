@@ -126,8 +126,11 @@ clang++ -std=c++17 -fsyntax-only -Wall -Wextra \
   Termux libc++_shared с `patchelf --set-soname libcxx_vhlt.so`). Ключевые
   детали: бинарники — **исполняемые PIE** (`make`, интерпретатор
   /system/bin/linker64), НЕ `-shared` (иначе SIGILL на устройстве); после
-  `cp` — `patchelf --replace-needed libc++_shared.so libcxx_vhlt.so` и
-  `patchelf --remove-rpath`. CI-скрипт (Makefile в vhlt): `make bin/hlcsg` и т.п.
+   `cp` — `patchelf --replace-needed libc++_shared.so libcxx_vhlt.so` и
+   `patchelf --set-rpath '$ORIGIN'` (при exec из приложения нет
+   LD_LIBRARY_PATH — bionic находит libcxx_vhlt.so только через $ORIGIN;
+   страховка — env LD_LIBRARY_PATH в `MapCompiler.runStageWithProcess`).
+   CI-скрипт (Makefile в vhlt): `make bin/hlcsg` и т.п.
   Полный цикл CSG→BSP→VIS→RAD на warzone: все exit=0, BSP ~115 КБ со
   светокартами, без LEAK.
 - Исправлены 2 блокера компиляции (без них .map не компилировался вообще):
@@ -140,6 +143,15 @@ clang++ -std=c++17 -fsyntax-only -Wall -Wextra \
   повторить.
 - `MapCompiler` при компиляции копирует `textures.wad` проекта в `valve/`
   (движок ищет WAD по имени из worldspawn относительно gamedir).
+- **Инцидент 2026-10-18 (вечер)**: пользователь жаловался «компилирует —
+  выдаёт ошибку». Причина оказалась двойной: (1) у него стоял СТАРЫЙ APK
+  (до `1a3c47c`) — он перезаписывал проект в старом формате (без
+  `mapversion 220`, старый порядок точек) → hlcsg падал с «Expecting '(' got
+  ']'»; (2) в свежих APK бинарники искали libcxx_vhlt.so через удалённый
+  RUNPATH. Исправлено: RUNPATH `$ORIGIN` + env в MapCompiler (коммит
+  `be46bba`, CI run `39157054578`), проект перегенерирован GenWar. Диагностика
+  важна: проект в Documents старый APK может испортить при сохранении —
+  проверять `mapversion` в начале main.map (`grep mapversion`).
 
 ## Что делать дальше (идеи)
 
