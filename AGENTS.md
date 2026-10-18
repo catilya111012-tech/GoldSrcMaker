@@ -156,6 +156,9 @@ clang++ -std=c++17 -fsyntax-only -Wall -Wextra \
 ## Что делать дальше (идеи)
 
 - Коммит/пуш — только по явной команде пользователя (см. обязанности выше).
+- **По команде пользователя** (он предупредил заранее, сам не делать):
+  сменить название приложения на «Прототип» и начать нумеровать версии
+  0.0.1 → 0.0.1.1 → 0.0.1.2 (versionName/APK, About и т.п.).
 - Android-файлы (TexturesActivity, ModelEditorActivity, PixelCanvasView,
   PaletteView, правки MainActivity/EditorActivity/Manifest) локально не
   компилируются — CI соберёт; при правках быть аккуратным с API.
