@@ -147,7 +147,8 @@ public final class GameLauncher {
         intent.setComponent(new ComponentName(packageName, activityName));
         intent.putExtra("basedir", workingRoot.getAbsolutePath());
         intent.putExtra("gamedir", GAME_DIR_NAME);
-        intent.putExtra("argv", "-log +map " + mapName);
+        intent.putExtra("argv", "-log " + workingRoot.getAbsolutePath()
+                + "/game.log +touch_enable 1 +map " + mapName);
         return intent;
     }
 
