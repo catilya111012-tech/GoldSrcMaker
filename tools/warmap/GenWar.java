@@ -131,18 +131,37 @@ public class GenWar {
         crate(-384, 112, -8);
         crate(400, -96, -8);
 
+        // стартовая оружейная: пустая комната с оружием (врагов нет),
+        // выход на север — в деревню с HECU
+        box(-224, -464, -16, -192, -256, 192, "WARCONC");  // западная стена
+        box(192, -464, -16, 224, -256, 192, "WARCONC");    // восточная стена
+        box(-224, -288, -16, -48, -256, 192, "WARCONC");   // северная стена, слева от двери
+        box(48, -288, -16, 224, -256, 192, "WARCONC");     // северная стена, справа от двери
+        box(-224, -464, 192, 224, -256, 208, "WARMETAL");  // потолок
+        crate(-160, -336, 0);
+        crate(160, -336, 0);
+
         // свет неба
         ent("light_environment", 0, 320, 430, "pitch", "-90", "light", "300",
                 "_light", "170 180 200 350");
 
-        // старт игрока
-        ent("info_player_start", 0, -448, 24, "angle", "90", "angles", "0 90 0");
-        ent("item_suit", 48, -448, 8);
-        ent("weapon_crowbar", -32, -432, 8);
-        ent("weapon_9mmhandgun", 0, -432, 8);
-        ent("ammo_9mmclip", -64, -432, 8);
-        ent("item_healthkit", 96, -432, 8);
-        ent("light", 0, -416, 120, "light", "200");
+        // старт игрока: оружейная (без врагов)
+        ent("info_player_start", 0, -432, 24, "angle", "90", "angles", "0 90 0");
+        ent("item_suit", 48, -432, 8);
+        ent("weapon_crowbar", -144, -448, 8);
+        ent("weapon_9mmhandgun", -144, -416, 8);
+        ent("ammo_9mmclip", -144, -384, 8);
+        ent("weapon_handgrenade", -144, -352, 8);
+        ent("weapon_9mmAR", 144, -448, 8);
+        ent("ammo_9mmAR", 144, -416, 8);
+        ent("ammo_9mmAR", 144, -384, 8);
+        ent("weapon_shotgun", 144, -352, 8);
+        ent("item_healthkit", -48, -368, 8);
+        ent("ammo_9mmclip", -160, -336, 40);
+        ent("ammo_buckshot", 160, -336, 40);
+        ent("light", 0, -360, 150, "light", "300");
+        ent("light", -128, -440, 140, "light", "220");
+        ent("light", 128, -440, 140, "light", "220");
 
         // улица: припасы за мешками
         ent("weapon_9mmAR", -88, -240, 8);
@@ -365,11 +384,11 @@ public class GenWar {
 
         BlockNode start = graph.addNode(BlockType.ON_MAP_START, 40, 40);
         BlockNode welcome = graph.addNode(BlockType.ACTION_SHOW_MESSAGE, 40, 180);
-        welcome.setParam("text", "Деревня занята солдатами HECU! Пробейся к бункеру на севере.");
+        welcome.setParam("text", "Оружейная: возьми снаряжение. За дверью на севере — деревня с HECU.");
         BlockNode pause = graph.addNode(BlockType.ACTION_DELAY, 40, 320);
         pause.setParam("seconds", "4");
         BlockNode hint = graph.addNode(BlockType.ACTION_SHOW_MESSAGE, 40, 460);
-        hint.setParam("text", "Подбери MP5 за мешками. Берегись стрелков на крыше бункера!");
+        hint.setParam("text", "Бери дробовик, MP5 и гранаты. Берегись стрелков на крыше бункера!");
 
         BlockNode bossDead = graph.addNode(BlockType.ON_ENTITY_DEATH, 400, 40);
         bossDead.setParam("target", "boss");
