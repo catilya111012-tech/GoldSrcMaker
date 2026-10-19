@@ -179,8 +179,7 @@ public final class GameLauncher {
         Intent intent = new Intent(context, XashActivity.class);
         intent.putExtra("basedir", workingRoot.getAbsolutePath());
         intent.putExtra("gamedir", GAME_DIR_NAME);
-        intent.putExtra("argv", "-log " + workingRoot.getAbsolutePath()
-                + "/game.log +touch_enable 1 +map " + mapName);
+        intent.putExtra("argv", buildGameArgv(workingRoot, mapName));
         return intent;
     }
 
@@ -190,9 +189,15 @@ public final class GameLauncher {
         intent.setComponent(new ComponentName(packageName, activityName));
         intent.putExtra("basedir", workingRoot.getAbsolutePath());
         intent.putExtra("gamedir", GAME_DIR_NAME);
-        intent.putExtra("argv", "-log " + workingRoot.getAbsolutePath()
-                + "/game.log +touch_enable 1 +map " + mapName);
+        intent.putExtra("argv", buildGameArgv(workingRoot, mapName));
         return intent;
+    }
+
+    /** Аргументы запуска: лог, сенсорное управление и видимый индикатор джойстика. */
+    private static String buildGameArgv(File workingRoot, String mapName) {
+        return "-log " + workingRoot.getAbsolutePath() + "/game.log"
+                + " +touch_enable 1 +touch_move_indicator 1"
+                + " +map " + mapName;
     }
 
     public static boolean engineHasAllFilesAccess(Context context, String packageName) {
