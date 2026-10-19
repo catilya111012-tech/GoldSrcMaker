@@ -1,4 +1,20 @@
-# Компиляторы карт в jniLibs/arm64-v8a
+# Нативные библиотеки в jniLibs/arm64-v8a
+
+Здесь лежат две группы библиотек (обе — GPL-совместимые, см. корневой
+`THIRD_PARTY_NOTICES.md`):
+
+1. **Встроенный движок Xash3D FWGS** (arm64): `libxash.so`, `libSDL2.so`,
+   `libmenu.so`, `libfilesystem_stdio.so`, `libref_gles3compat.so`,
+   `libref_gles1.so`, `libref_gl4es.so`, игровые библиотеки
+   `libhl_android_arm64.so` / `libclient_android_arm64.so` и библиотеки
+   FFmpeg (`libavcodec`, `libavformat`, `libavutil`, `libswscale`,
+   `libswresample`). Это бинарники из официального APK
+   `xash3d-fwgs-android.apk` (FWGS/xash3d-fwgs, continuous), чтобы игроку
+   не нужно было устанавливать движок отдельно. Точка входа —
+   `com.goldsrc.maker.engine.XashActivity` (порт `su.xash.engine.XashActivity`).
+2. **Компиляторы карт** (см. ниже).
+
+## Компиляторы карт
 
 Здесь лежат скомпилированные инструменты компиляции карт (GPL):
 

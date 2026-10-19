@@ -9,12 +9,15 @@
 
 - В APK нет ни одной оригинальной ассеты Valve. Только код и пустой каркас каталогов.
 - Компиляторы карт (`hlcsg`/`hlbsp`/`hlvis`/`hlrad`) — сторонние свободные утилиты
-  (VHLT, ericw-tools; GPL). Приложение их не распространяет: бинарники кладутся
-  в проект отдельно (см. ниже) или собираются из исходников через NDK.
-- Движок для запуска карт — свободный Xash3D FWGS (F-Droid `su.xash.engine`).
-  Лаунчер только передаёт ему параметры запуска.
-- Код проекта распространяется по лицензии MIT (см. `LICENSE`),
-  сторонние компоненты и товарные знаки — см. `THIRD_PARTY_NOTICES.md`.
+  (VHLT, ericw-tools; GPL), их бинарники для arm64 встроены в APK и запускаются
+  напрямую из `nativeLibraryDir`.
+- Движок для запуска карт — свободный Xash3D FWGS (GPL-3.0), **встроен в APK**
+  (нативные библиотеки + ассеты движка). Отдельная установка движка не нужна;
+  если сборка без встроенного движка (другие ABI), лаунчер по-прежнему умеет
+  запускать внешний Xash3D FWGS (`su.xash.engine`).
+- Сам код проекта распространяется по лицензии **GNU GPL v3** (см. `LICENSE`) —
+  этого требует встраивание GPL-движка. Сторонние компоненты и товарные знаки —
+  см. `THIRD_PARTY_NOTICES.md`.
 - Half-Life, GoldSrc и связанные обозначения — товарные знаки Valve Corporation.
   Проект не связан с Valve, не одобрен и не спонсируется ею.
 
@@ -27,6 +30,9 @@ GoldSrcMaker/
     ├── build.gradle
     └── src/main/
         ├── AndroidManifest.xml
+        ├── assets/                            # ассеты встроенного движка (gfx/shell, шрифты, touch_*)
+        ├── jniLibs/arm64-v8a/                 # встроенный Xash3D FWGS + компиляторы VHLT (GPL)
+        ├── java/org/libsdl/app/               # SDL2 для Android (zlib)
         ├── java/com/goldsrc/maker/
         │   ├── MainActivity.java              # лаунчер + проверка ресурсов + init конструктора
         │   ├── core/
@@ -63,8 +69,10 @@ GoldSrcMaker/
         │   │   ├── CompilerNative.java        # JNI-мост к портам компиляторов
         │   │   ├── CompilerToolchain.java     # поиск/проверка запуска hlcsg/hlbsp/hlvis/hlrad
         │   │   └── MapCompiler.java           # пайплайн CSG→BSP→VIS→RAD + живой лог стадий
+        │   ├── engine/
+        │   │   └── XashActivity.java          # встроенный движок: порт su.xash.engine.XashActivity
         │   ├── launcher/
-        │   │   └── GameLauncher.java          # запуск Xash3D FWGS с -basedir/-game/+map
+        │   │   └── GameLauncher.java          # запуск встроенного/внешнего Xash3D с -basedir/-game/+map
         │   └── render/
         │       ├── VulkanPreviewActivity.java # превью карты: геометрия из проекта
         │       ├── GeometryBuilder.java       # браши/энтити → вершинные буферы (pos+цвет)
@@ -97,9 +105,11 @@ GoldSrcMaker/
 ## Сборка
 
 1. Android Studio (Ladybug+) или `./gradlew assembleDebug` (нужны JDK 17 + NDK).
-2. Для запуска карт: установите Xash3D FWGS с F-Droid. Лаунчер запускает
-   `XashActivity` напрямую с extras `basedir`/`gamedir`/`argv=+map <имя>` и проверяет
-   наличие `halflife.wad` и `maps/<имя>.bsp` перед запуском.
+2. Для запуска карт ничего доустанавливать не нужно: движок Xash3D FWGS встроен
+   (arm64-v8a, `com.goldsrc.maker.engine.XashActivity` — порт `su.xash.engine.XashActivity`).
+   Лаунчер запускает его с extras `basedir`/`gamedir`/`argv=+map <имя>` и проверяет
+   наличие `halflife.wad` и `maps/<имя>.bsp` перед запуском. На ABI без встроенных
+   библиотек (x86_64) используется внешний Xash3D FWGS, если он установлен.
 3. Для компиляции карт есть два пути:
    - **SAF-импорт**: в приложении кнопка «Импорт компиляторов (SAF)» — выберите папку
      с бинарниками `libhlcsg.so` / `libhlbsp.so` / `libhlvis.so` / `libhlrad.so`.

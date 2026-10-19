@@ -12,6 +12,8 @@ import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.os.Build;
 
+import com.goldsrc.maker.engine.XashActivity;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -24,6 +26,7 @@ public final class GameLauncher {
         public final String fatalError;
         public final List<String> warnings = new ArrayList<>();
         public String enginePackage;
+        public boolean embedded;
 
         private LaunchPlan(Intent intent, String fatalError) {
             this.intent = intent;
@@ -64,8 +67,22 @@ public final class GameLauncher {
         return null;
     }
 
+    /** Встроенный движок: нативные библиотеки лежат внутри нашего APK. */
+    public static boolean hasEmbeddedEngine(Context context) {
+        try {
+            String libDir = context.getApplicationInfo().nativeLibraryDir;
+            if (libDir == null) {
+                return false;
+            }
+            return new File(libDir, "libxash.so").isFile()
+                    && new File(libDir, "libSDL2.so").isFile();
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
     public static boolean isEngineInstalled(Context context) {
-        return findEnginePackage(context) != null;
+        return hasEmbeddedEngine(context) || findEnginePackage(context) != null;
     }
 
     public static String findEngineActivity(Context context, String packageName) {
@@ -96,15 +113,22 @@ public final class GameLauncher {
             return new LaunchPlan(null, "Не задано имя карты для запуска.");
         }
 
-        String packageName = findEnginePackage(context);
+        boolean embedded = hasEmbeddedEngine(context);
+        String packageName = embedded ? context.getPackageName() : findEnginePackage(context);
         if (packageName == null) {
             return new LaunchPlan(null, "Движок Xash3D FWGS не установлен.\n"
                     + "Установите свободный движок (open-source) и повторите запуск.");
         }
 
-        String activityName = findEngineActivity(context, packageName);
-        if (activityName == null) {
-            return new LaunchPlan(null, "У движка " + packageName + " не найдена точка запуска XashActivity.");
+        Intent intent;
+        if (embedded) {
+            intent = buildEmbeddedIntent(context, workingRoot, mapName);
+        } else {
+            String activityName = findEngineActivity(context, packageName);
+            if (activityName == null) {
+                return new LaunchPlan(null, "У движка " + packageName + " не найдена точка запуска XashActivity.");
+            }
+            intent = buildLaunchIntent(packageName, activityName, workingRoot, mapName);
         }
 
         File valveDir = new File(workingRoot, GAME_DIR_NAME);
@@ -119,19 +143,28 @@ public final class GameLauncher {
                     + "\n\nСкопируйте оригинальные файлы текстур со своего ПК отдельно.");
         }
 
-        LaunchPlan plan = new LaunchPlan(buildLaunchIntent(packageName, activityName, workingRoot, mapName), null);
+        LaunchPlan plan = new LaunchPlan(intent, null);
         plan.enginePackage = packageName;
+        plan.embedded = embedded;
 
         if (!new File(valveDir, "pak0.pak").isFile()) {
             plan.warnings.add("Не найден pak0.pak: меню, спрайты, звуки и модели вашей игры "
                     + "могут не загрузиться. Скопируйте его в " + valveDir.getAbsolutePath());
         }
         if (!engineHasAllFilesAccess(context, packageName)) {
-            plan.warnings.add("У движка Xash3D нет разрешения «Доступ ко всем файлам» — "
-                    + "без него движок не увидит файлы игры. Выдайте его: Настройки → "
-                    + "Приложения → Xash3D → Разрешения → «Файлы и медиа» → "
-                    + "«Разрешить управление всеми файлами» (на Samsung: Настройки → "
-                    + "Приложения → ⋮ «Специальный доступ» → «Управление всеми файлами»).");
+            if (embedded) {
+                plan.warnings.add("У приложения нет разрешения «Доступ ко всем файлам» — "
+                        + "без него встроенный движок не увидит файлы игры. Выдайте его: Настройки → "
+                        + "Приложения → GoldSrcMaker → Разрешения → «Файлы и медиа» → "
+                        + "«Разрешить управление всеми файлами» (на Samsung: Настройки → "
+                        + "Приложения → ⋮ «Специальный доступ» → «Управление всеми файлами»).");
+            } else {
+                plan.warnings.add("У движка Xash3D нет разрешения «Доступ ко всем файлам» — "
+                        + "без него движок не увидит файлы игры. Выдайте его: Настройки → "
+                        + "Приложения → Xash3D → Разрешения → «Файлы и медиа» → "
+                        + "«Разрешить управление всеми файлами» (на Samsung: Настройки → "
+                        + "Приложения → ⋮ «Специальный доступ» → «Управление всеми файлами»).");
+            }
         }
         if (isPrivateStorage(context, workingRoot)) {
             plan.warnings.add("Рабочая папка находится в приватном хранилище приложения. "
@@ -139,6 +172,16 @@ public final class GameLauncher {
                     + "и используйте общий каталог Documents/GoldSrcMaker.");
         }
         return plan;
+    }
+
+    /** Запуск встроенного движка внутри нашего приложения. */
+    public static Intent buildEmbeddedIntent(Context context, File workingRoot, String mapName) {
+        Intent intent = new Intent(context, XashActivity.class);
+        intent.putExtra("basedir", workingRoot.getAbsolutePath());
+        intent.putExtra("gamedir", GAME_DIR_NAME);
+        intent.putExtra("argv", "-log " + workingRoot.getAbsolutePath()
+                + "/game.log +touch_enable 1 +map " + mapName);
+        return intent;
     }
 
     public static Intent buildLaunchIntent(String packageName, String activityName,
@@ -223,7 +266,8 @@ public final class GameLauncher {
                     .setPositiveButton("Всё равно запустить", (dialog, which) -> doLaunch(activity, plan))
                     .setNegativeButton("Отмена", null);
             if (plan.enginePackage != null) {
-                builder.setNeutralButton("Настройки Xash3D", (dialog, which) -> openEngineSettings(activity, plan.enginePackage));
+                String settingsLabel = plan.embedded ? "Настройки приложения" : "Настройки Xash3D";
+                builder.setNeutralButton(settingsLabel, (dialog, which) -> openEngineSettings(activity, plan.enginePackage));
             }
             builder.show();
             return;

@@ -8,6 +8,8 @@
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="29" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <uses-feature
         android:name="android.hardware.vulkan.version"
@@ -61,6 +63,19 @@
             android:name=".render.VulkanPreviewActivity"
             android:configChanges="orientation|screenSize|keyboardHidden|screenLayout"
             android:exported="false" />
+
+        <!-- Встроенный движок Xash3D FWGS (порт su.xash.engine.XashActivity).
+             Окно всегда полноэкранное, поэтому система игнорирует
+             windowSoftInputMode, а SoftKeyboardPan панорамирует вид сам. -->
+        <activity
+            android:name=".engine.XashActivity"
+            android:alwaysRetainTaskState="true"
+            android:configChanges="orientation|uiMode|screenLayout|screenSize|smallestScreenSize|keyboard|keyboardHidden|navigation|touchscreen"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:preferMinimalPostProcessing="true"
+            android:screenOrientation="sensorLandscape"
+            android:windowSoftInputMode="adjustPan" />
     </application>
 
 </manifest>
