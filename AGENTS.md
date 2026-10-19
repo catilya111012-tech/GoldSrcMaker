@@ -48,6 +48,29 @@ clang++ -std=c++17 -fsyntax-only -Wall -Wextra \
 `bash tools/shaders/build.sh` (нужен `pkg install glslang`) — обновит
 `app/src/main/cpp/spirv_shaders.h` (он коммитится, чтобы CI не требовал glslang).
 
+## Встроенный движок (Xash3D FWGS, GPL-3.0)
+
+- По решению пользователя (2026-10-19) движок **встроен в APK** (arm64-v8a):
+  нативные библиотеки в `app/src/main/jniLibs/arm64-v8a/` (libxash, libSDL2,
+  libmenu, libfilesystem_stdio, libref_*, FFmpeg, игровые `libhl_android_arm64.so`
+  и `libclient_android_arm64.so`), ассеты движка в `app/src/main/assets/`,
+  Java-обвязка — `app/src/main/java/org/libsdl/app/` (SDL2 2.32.10, zlib) и
+  `app/src/main/java/com/goldsrc/maker/engine/XashActivity.java` (+ `util/SoftKeyboardPan.java`,
+  порт `su.xash.engine.XashActivity`, GPL-3.0). Источник бинарников — официальный
+  `xash3d-fwgs-android.apk` (FWGS continuous).
+- Из-за GPL-движка **вся лицензия проекта — GPL-3.0** (`LICENSE`), обновлён
+  `THIRD_PARTY_NOTICES.md`; при изменениях не возвращать MIT-совместимые
+  ограничения. Данные игр Valve по-прежнему НЕ коммитятся.
+- `GameLauncher` приоритетно запускает `com.goldsrc.maker.engine.XashActivity`
+  (если в nativeLibraryDir есть libxash.so), иначе — внешний Xash3D
+  (`su.xash.engine`, `su.xash.engine.test`, `in.celest.xash3d.fwgs`).
+  extras: `basedir`, `gamedir=valve`, `argv=-log <basedir>/game.log +touch_enable 1 +map <имя>`.
+- Подпись CI-сборок: публичный ключ `keystore/ci.jks` (см. `keystore/README.md`) —
+  нужен для установки обновлений поверх без удаления; сборка `assembleDebug`
+  использует его (см. `app/build.gradle`).
+- ВАЖНО: `app/src/main/jniLibs/arm64-v8a/` содержит GPL-бинарники (движок и
+  компиляторы) — не удалять; исключения в `.gitignore` настроены на папку.
+
 ## Ключевые файлы
 
 - `app/src/main/java/com/goldsrc/maker/MainActivity.java` — лаунчер: проекты,
@@ -65,11 +88,13 @@ clang++ -std=c++17 -fsyntax-only -Wall -Wextra \
 - `.../scripting/HybridScriptEngine.java` + `ScriptSimulator.java` — логика
 - `.../compiler/MapCompiler.java` + `CompilerToolchain.java` — пайплайн
   CSG→BSP→VIS→RAD, поиск/проверка запуска бинарников
-- `.../launcher/GameLauncher.java` — запуск `su.xash.engine.XashActivity`
-  с extras `basedir`/`gamedir`/`argv` (+ проверки); поддерживаемые пакеты:
-  `su.xash.engine`, `su.xash.engine.test` (сборки с trashbox/4pda),
-  `in.celest.xash3d.fwgs`. При добавлении пакетов — не забыть `<queries>`
-  в `AndroidManifest.xml` (иначе Android 11+ скрывает их от приложения)
+- `.../engine/XashActivity.java` — встроенный движок (порт `su.xash.engine.XashActivity`);
+  `.../engine/util/SoftKeyboardPan.java` — панорамирование под клавиатуру
+- `.../launcher/GameLauncher.java` — запуск встроенного движка приоритетно
+  (`com.goldsrc.maker.engine.XashActivity`), иначе внешнего
+  (`su.xash.engine`, `su.xash.engine.test`, `in.celest.xash3d.fwgs`) с extras
+  `basedir`/`gamedir`/`argv` (+ проверки). При добавлении внешних пакетов — не
+  забыть `<queries>` в `AndroidManifest.xml` (иначе Android 11+ скрывает их)
 - `.../render/GeometryBuilder.java` — браши/энтити → вершинные данные
 - `app/src/main/cpp/vulkan_renderer.cpp` — Vulkan: swapchain, depth, pipeline
 - `app/src/main/cpp/native_bridge.cpp` — fork/exec стадий компиляции

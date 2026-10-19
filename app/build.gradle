@@ -33,13 +33,25 @@ android {
         }
     }
 
+    signingConfigs {
+        // Публичный ключ для CI-сборок (не секрет): стабильная подпись, чтобы
+        // обновления ставились поверх предыдущих сборок. Для магазина заменить.
+        ci {
+            storeFile file('../keystore/ci.jks')
+            storePassword 'goldsrcmaker'
+            keyAlias 'goldsrc'
+            keyPassword 'goldsrcmaker'
+        }
+    }
+
     buildTypes {
         debug {
             minifyEnabled false
+            signingConfig signingConfigs.ci
         }
         release {
             minifyEnabled false
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.ci
         }
     }
 
