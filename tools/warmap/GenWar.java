@@ -150,11 +150,13 @@ public class GenWar {
         ent("ammo_9mmclip", -72, -240, 8);
         ent("weapon_handgrenade", 96, -240, 8);
         ent("ammo_ARgrenades", 120, -240, 8);
+        ent("item_battery", 0, -352, 8);
         ent("light", 0, -320, 160, "light", "280");
+        ent("item_healthkit", 0, -96, 8);
 
-        // первая линия HECU
-        ent("monster_human_grunt", -88, -160, 8, "angle", "270", "weapons", "1");
-        ent("monster_human_grunt", 88, -160, 8, "angle", "270", "weapons", "1");
+        // первая линия HECU (спиной к спавну, чтобы не расстреливали сразу)
+        ent("monster_human_grunt", -88, -32, 8, "angle", "180", "weapons", "1");
+        ent("monster_human_grunt", 88, -32, 8, "angle", "0", "weapons", "1");
 
         // горящие ящики
         ent("env_fire", -120, -152, 48, "firesize", "64", "firehealth", "1000000",
