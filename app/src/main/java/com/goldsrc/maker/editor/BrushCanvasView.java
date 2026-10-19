@@ -18,6 +18,7 @@ import java.util.Map;
 public class BrushCanvasView extends View {
 
     public enum Mode {
+        SELECT,
         WALL,
         ROOM,
         ENTITY,
@@ -95,6 +96,14 @@ public class BrushCanvasView extends View {
     private boolean dragPushedUndo;
     private int dragStartOriginX;
     private int dragStartOriginY;
+    private Brush selectedBrush;
+    private Brush draggingBrush;
+    private boolean brushDragPushedUndo;
+    private int brushStartX1;
+    private int brushStartY1;
+    private int brushStartX2;
+    private int brushStartY2;
+    private boolean panning;
     private float downScreenX;
     private float downScreenY;
     private boolean tapCandidate;
@@ -136,6 +145,9 @@ public class BrushCanvasView extends View {
         undoStack.clear();
         selectedEntity = null;
         draggingEntity = null;
+        selectedBrush = null;
+        draggingBrush = null;
+        panning = false;
         invalidate();
     }
 
@@ -191,8 +203,86 @@ public class BrushCanvasView extends View {
         invalidate();
     }
 
+    public boolean deleteSelection() {
+        if (selectedEntity != null && mapData.entities.contains(selectedEntity)) {
+            pushUndo();
+            mapData.entities.remove(selectedEntity);
+            selectedEntity = null;
+            draggingEntity = null;
+            fireChanged();
+            invalidate();
+            return true;
+        }
+        if (selectedBrush != null && mapData.brushes.contains(selectedBrush)) {
+            pushUndo();
+            mapData.brushes.remove(selectedBrush);
+            selectedBrush = null;
+            draggingBrush = null;
+            fireChanged();
+            invalidate();
+            return true;
+        }
+        return false;
+    }
+
+    public void zoomBy(float factor) {
+        if (getWidth() <= 0 || getHeight() <= 0) {
+            return;
+        }
+        float centerX = getWidth() / 2f;
+        float centerY = getHeight() / 2f;
+        float worldX = screenToWorldX(centerX);
+        float worldY = screenToWorldY(centerY);
+        scale = Math.max(0.05f, Math.min(4f, scale * factor));
+        offsetX = worldX - centerX / scale;
+        offsetY = worldY - centerY / scale;
+        invalidate();
+    }
+
+    public void fitToMap() {
+        if (getWidth() <= 0 || getHeight() <= 0) {
+            return;
+        }
+        int minX = Integer.MAX_VALUE;
+        int minY = Integer.MAX_VALUE;
+        int maxX = Integer.MIN_VALUE;
+        int maxY = Integer.MIN_VALUE;
+        for (Brush brush : mapData.brushes) {
+            minX = Math.min(minX, brush.x1);
+            minY = Math.min(minY, brush.y1);
+            maxX = Math.max(maxX, brush.x2);
+            maxY = Math.max(maxY, brush.y2);
+        }
+        for (EntityData entity : mapData.entities) {
+            minX = Math.min(minX, entity.originX() - 32);
+            minY = Math.min(minY, entity.originY() - 32);
+            maxX = Math.max(maxX, entity.originX() + 32);
+            maxY = Math.max(maxY, entity.originY() + 32);
+        }
+        if (minX > maxX || minY > maxY) {
+            scale = 0.35f;
+            offsetX = -256f;
+            offsetY = -256f;
+            invalidate();
+            return;
+        }
+        float paddingWorld = 24f;
+        float scaleX = (getWidth() - paddingWorld * 2f) / Math.max(1f, maxX - minX);
+        float scaleY = (getHeight() - paddingWorld * 2f) / Math.max(1f, maxY - minY);
+        scale = Math.max(0.05f, Math.min(4f, Math.min(scaleX, scaleY)));
+        float centerWorldX = (minX + maxX) / 2f;
+        float centerWorldY = (minY + maxY) / 2f;
+        offsetX = centerWorldX - getWidth() / 2f / scale;
+        offsetY = centerWorldY - getHeight() / 2f / scale;
+        invalidate();
+    }
+
     public void setMode(Mode mode) {
         this.mode = mode;
+        if (mode != Mode.SELECT) {
+            selectedBrush = null;
+        }
+        invalidate();
     }
 
     public void setTexture(String texture) {
@@ -239,6 +329,8 @@ public class BrushCanvasView extends View {
             mapData = MapData.fromJson(new JSONObject(undoStack.pop()));
             selectedEntity = null;
             draggingEntity = null;
+            selectedBrush = null;
+            draggingBrush = null;
         } catch (JSONException ignored) {
         }
         fireChanged();
@@ -361,6 +453,12 @@ public class BrushCanvasView extends View {
             canvas.drawCircle(screenX, screenY, 20f, selectionPaint);
         }
 
+        if (selectedBrush != null && mapData.brushes.contains(selectedBrush)) {
+            rect.set(worldToScreenX(selectedBrush.x1), worldToScreenY(selectedBrush.y1),
+                    worldToScreenX(selectedBrush.x2), worldToScreenY(selectedBrush.y2));
+            canvas.drawRect(rect, selectionPaint);
+        }
+
         if (drawing) {
             float left = worldToScreenX(Math.min(startWorldX, currentWorldX));
             float top = worldToScreenY(Math.min(startWorldY, currentWorldY));
@@ -385,10 +483,26 @@ public class BrushCanvasView extends View {
                     EntityData hit = hitEntity(event.getX(), event.getY());
                     if (hit != null) {
                         selectedEntity = hit;
+                        selectedBrush = null;
                         draggingEntity = hit;
                         dragPushedUndo = false;
                         dragStartOriginX = hit.originX();
                         dragStartOriginY = hit.originY();
+                        invalidate();
+                    } else if (mode == Mode.SELECT) {
+                        Brush brushHit = hitBrush(event.getX(), event.getY());
+                        selectedEntity = null;
+                        selectedBrush = brushHit;
+                        if (brushHit != null) {
+                            draggingBrush = brushHit;
+                            brushDragPushedUndo = false;
+                            brushStartX1 = brushHit.x1;
+                            brushStartY1 = brushHit.y1;
+                            brushStartX2 = brushHit.x2;
+                            brushStartY2 = brushHit.y2;
+                        } else {
+                            panning = true;
+                        }
                         invalidate();
                     } else {
                         drawing = true;
@@ -409,6 +523,9 @@ public class BrushCanvasView extends View {
                     erasing = false;
                     draggingEntity = null;
                     dragPushedUndo = false;
+                    draggingBrush = null;
+                    brushDragPushedUndo = false;
+                    panning = false;
                     pinching = true;
                     pinchStartDistance = distance(event);
                     pinchStartScale = scale;
@@ -423,10 +540,12 @@ public class BrushCanvasView extends View {
                 if (pinching && event.getPointerCount() >= 2) {
                     float currentDistance = distance(event);
                     if (pinchStartDistance > 1f) {
+                        float focusX = (event.getX(0) + event.getX(1)) / 2f;
+                        float focusY = (event.getY(0) + event.getY(1)) / 2f;
                         float newScale = pinchStartScale * (currentDistance / pinchStartDistance);
                         scale = Math.max(0.05f, Math.min(4f, newScale));
-                        offsetX = pinchFocusWorldX - pinchFocusScreenX / scale;
-                        offsetY = pinchFocusWorldY - pinchFocusScreenY / scale;
+                        offsetX = pinchFocusWorldX - focusX / scale;
+                        offsetY = pinchFocusWorldY - focusY / scale;
                         invalidate();
                     }
                 } else if (draggingEntity != null) {
@@ -445,13 +564,26 @@ public class BrushCanvasView extends View {
                         draggingEntity.setOrigin(newX, newY, draggingEntity.originZ());
                         invalidate();
                     }
-                } else if (erasing) {
-                    eraseAt(screenToWorldX(event.getX()), screenToWorldY(event.getY()));
-                } else if (drawing) {
-                    currentWorldX = snap((int) screenToWorldX(event.getX()));
-                    currentWorldY = snap((int) screenToWorldY(event.getY()));
-                    invalidate();
-                } else {
+                } else if (draggingBrush != null) {
+                    float dx = event.getX() - downScreenX;
+                    float dy = event.getY() - downScreenY;
+                    if (dx * dx + dy * dy > TAP_SLOP_PX * TAP_SLOP_PX) {
+                        tapCandidate = false;
+                    }
+                    if (!tapCandidate) {
+                        if (!brushDragPushedUndo) {
+                            pushUndo();
+                            brushDragPushedUndo = true;
+                        }
+                        int worldDx = snap(Math.round(dx / scale));
+                        int worldDy = snap(Math.round(dy / scale));
+                        draggingBrush.x1 = brushStartX1 + worldDx;
+                        draggingBrush.x2 = brushStartX2 + worldDx;
+                        draggingBrush.y1 = brushStartY1 + worldDy;
+                        draggingBrush.y2 = brushStartY2 + worldDy;
+                        invalidate();
+                    }
+                } else if (panning) {
                     float panDx = event.getX() - lastTouchX;
                     float panDy = event.getY() - lastTouchY;
                     if (panDx * panDx + panDy * panDy > TAP_SLOP_PX * TAP_SLOP_PX) {
@@ -459,6 +591,12 @@ public class BrushCanvasView extends View {
                     }
                     offsetX -= panDx / scale;
                     offsetY -= panDy / scale;
+                    invalidate();
+                } else if (erasing) {
+                    eraseAt(screenToWorldX(event.getX()), screenToWorldY(event.getY()));
+                } else if (drawing) {
+                    currentWorldX = snap((int) screenToWorldX(event.getX()));
+                    currentWorldY = snap((int) screenToWorldY(event.getY()));
                     invalidate();
                 }
                 lastTouchX = event.getX();
@@ -478,6 +616,12 @@ public class BrushCanvasView extends View {
                     }
                     draggingEntity = null;
                     dragPushedUndo = false;
+                } else if (draggingBrush != null) {
+                    if (brushDragPushedUndo) {
+                        fireChanged();
+                    }
+                    draggingBrush = null;
+                    brushDragPushedUndo = false;
                 } else if (drawing) {
                     if (tap) {
                         if (mode == Mode.ENTITY) {
@@ -500,6 +644,7 @@ public class BrushCanvasView extends View {
                 drawing = false;
                 erasing = false;
                 pinching = false;
+                panning = false;
                 invalidate();
                 return true;
 
@@ -507,8 +652,11 @@ public class BrushCanvasView extends View {
                 drawing = false;
                 erasing = false;
                 pinching = false;
+                panning = false;
                 draggingEntity = null;
                 dragPushedUndo = false;
+                draggingBrush = null;
+                brushDragPushedUndo = false;
                 invalidate();
                 return true;
 
@@ -526,6 +674,20 @@ public class BrushCanvasView extends View {
             float dy = entityY - screenY;
             if (dx * dx + dy * dy <= HIT_RADIUS_PX * HIT_RADIUS_PX) {
                 return entity;
+            }
+        }
+        return null;
+    }
+
+    private Brush hitBrush(float screenX, float screenY) {
+        for (int i = mapData.brushes.size() - 1; i >= 0; i--) {
+            Brush brush = mapData.brushes.get(i);
+            float left = worldToScreenX(brush.x1);
+            float right = worldToScreenX(brush.x2);
+            float top = worldToScreenY(brush.y1);
+            float bottom = worldToScreenY(brush.y2);
+            if (screenX >= left && screenX <= right && screenY >= top && screenY <= bottom) {
+                return brush;
             }
         }
         return null;

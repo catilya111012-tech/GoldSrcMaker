@@ -60,10 +60,12 @@ public class EditorActivity extends Activity {
     private CodeEditorView codeView;
     private TextView statusView;
     private TextView caretView;
-    private LinearLayout canvasTools;
-    private LinearLayout blockTools;
-    private LinearLayout codeTools;
+    private HorizontalScrollView canvasTools;
+    private HorizontalScrollView blockTools;
+    private HorizontalScrollView codeTools;
 
+    private final Button[] modeButtons = new Button[4];
+    private Button selectButton;
     private Button wallButton;
     private Button roomButton;
     private Button entityButton;
@@ -73,7 +75,7 @@ public class EditorActivity extends Activity {
 
     private boolean codeDirty = false;
     private boolean busy = false;
-    private BrushCanvasView.Mode lastTool = BrushCanvasView.Mode.WALL;
+    private BrushCanvasView.Mode lastTool = BrushCanvasView.Mode.SELECT;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -138,8 +140,8 @@ public class EditorActivity extends Activity {
         blockTools = buildBlockTools();
         codeTools = buildCodeTools();
 
-        LinearLayout mainBar = new LinearLayout(this);
-        mainBar.setBackgroundColor(0xFF101820);
+        HorizontalScrollView mainBarScroll = toolbar();
+        LinearLayout mainBar = (LinearLayout) mainBarScroll.getChildAt(0);
         mainBar.addView(button("Сохранить", new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -176,43 +178,55 @@ public class EditorActivity extends Activity {
         root.addView(canvasTools);
         root.addView(blockTools);
         root.addView(codeTools);
-        root.addView(mainBar);
+        root.addView(mainBarScroll);
         root.addView(statusView);
 
         setContentView(root);
 
-        modeRow.addView(button("2D-конструктор", new View.OnClickListener() {
+        modeButtons[0] = button("2D-конструктор", new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 switchMode(0);
             }
-        }));
-        modeRow.addView(button("Блоки", new View.OnClickListener() {
+        });
+        modeButtons[1] = button("Блоки", new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 switchMode(1);
             }
-        }));
-        modeRow.addView(button("Код", new View.OnClickListener() {
+        });
+        modeButtons[2] = button("Код", new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 switchMode(2);
             }
-        }));
-        modeRow.addView(button("3D-превью (Vulkan)", new View.OnClickListener() {
+        });
+        modeButtons[3] = button("3D-превью (Vulkan)", new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 open3dPreview();
             }
-        }));
+        });
+        for (Button modeButton : modeButtons) {
+            modeRow.addView(modeButton);
+        }
 
         wireListeners();
         switchMode(0);
     }
 
-    private LinearLayout buildCanvasTools() {
-        LinearLayout row = toolbar();
+    private HorizontalScrollView buildCanvasTools() {
+        HorizontalScrollView scroll = toolbar();
+        LinearLayout row = (LinearLayout) scroll.getChildAt(0);
 
+        selectButton = button("Выбор", new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                lastTool = BrushCanvasView.Mode.SELECT;
+                canvasView.setMode(lastTool);
+                highlightTool(lastTool);
+            }
+        });
         wallButton = button("Стена", new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -291,13 +305,40 @@ public class EditorActivity extends Activity {
             }
         });
 
-        Button undoButton = button("Undo", new View.OnClickListener() {
+        Button undoButton = button("Отменить", new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 canvasView.undo();
             }
         });
+        Button deleteButton = button("Удалить", new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (!canvasView.deleteSelection()) {
+                    toast("Сначала выбери браш или энтити (режим «Выбор»)");
+                }
+            }
+        });
+        Button zoomOutButton = button("−", new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                canvasView.zoomBy(1f / 1.3f);
+            }
+        });
+        Button zoomInButton = button("+", new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                canvasView.zoomBy(1.3f);
+            }
+        });
+        Button fitButton = button("Вписать", new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                canvasView.fitToMap();
+            }
+        });
 
+        row.addView(selectButton);
         row.addView(wallButton);
         row.addView(roomButton);
         row.addView(entityButton);
@@ -307,11 +348,16 @@ public class EditorActivity extends Activity {
         row.addView(floorZField);
         row.addView(heightField);
         row.addView(undoButton);
-        return row;
+        row.addView(deleteButton);
+        row.addView(zoomOutButton);
+        row.addView(zoomInButton);
+        row.addView(fitButton);
+        return scroll;
     }
 
-    private LinearLayout buildBlockTools() {
-        LinearLayout row = toolbar();
+    private HorizontalScrollView buildBlockTools() {
+        HorizontalScrollView scroll = toolbar();
+        LinearLayout row = (LinearLayout) scroll.getChildAt(0);
         row.addView(button("Добавить блок", new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -326,11 +372,12 @@ public class EditorActivity extends Activity {
                 toast("Код сгенерирован из блоков");
             }
         }));
-        return row;
+        return scroll;
     }
 
-    private LinearLayout buildCodeTools() {
-        LinearLayout row = toolbar();
+    private HorizontalScrollView buildCodeTools() {
+        HorizontalScrollView scroll = toolbar();
+        LinearLayout row = (LinearLayout) scroll.getChildAt(0);
         row.addView(button("Код → блоки", new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -354,7 +401,7 @@ public class EditorActivity extends Activity {
         caretView.setPadding(dp(12), dp(10), dp(12), dp(10));
         caretView.setText("Стр 1:1");
         row.addView(caretView);
-        return row;
+        return scroll;
     }
 
     private void wireListeners() {
@@ -412,6 +459,13 @@ public class EditorActivity extends Activity {
         canvasTools.setVisibility(mode == 0 ? View.VISIBLE : View.GONE);
         blockTools.setVisibility(mode == 1 ? View.VISIBLE : View.GONE);
         codeTools.setVisibility(mode == 2 ? View.VISIBLE : View.GONE);
+        int active = 0xFF2E7D32;
+        int idle = 0xFF263238;
+        for (int i = 0; i < modeButtons.length; i++) {
+            if (modeButtons[i] != null) {
+                modeButtons[i].setBackgroundColor(i == mode ? active : idle);
+            }
+        }
         if (mode == 0) {
             highlightTool(lastTool);
         }
@@ -420,6 +474,7 @@ public class EditorActivity extends Activity {
     private void highlightTool(BrushCanvasView.Mode mode) {
         int active = 0xFF2E7D32;
         int idle = 0xFF263238;
+        selectButton.setBackgroundColor(mode == BrushCanvasView.Mode.SELECT ? active : idle);
         wallButton.setBackgroundColor(mode == BrushCanvasView.Mode.WALL ? active : idle);
         roomButton.setBackgroundColor(mode == BrushCanvasView.Mode.ROOM ? active : idle);
         entityButton.setBackgroundColor(mode == BrushCanvasView.Mode.ENTITY ? active : idle);
@@ -885,19 +940,30 @@ public class EditorActivity extends Activity {
         }
     }
 
-    private LinearLayout toolbar() {
+    private HorizontalScrollView toolbar() {
+        HorizontalScrollView scroll = new HorizontalScrollView(this);
+        scroll.setBackgroundColor(0xFF101820);
+        scroll.setHorizontalScrollBarEnabled(false);
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setBackgroundColor(0xFF101820);
-        return row;
+        row.setPadding(dp(6), dp(4), dp(6), dp(4));
+        scroll.addView(row);
+        return scroll;
     }
 
     private Button button(String text, View.OnClickListener listener) {
         Button button = new Button(this);
         button.setText(text);
-        button.setTextSize(13f);
+        button.setTextSize(14f);
+        button.setAllCaps(false);
         button.setBackgroundColor(0xFF263238);
         button.setTextColor(Color.WHITE);
+        button.setMinHeight(dp(44));
+        button.setPadding(dp(12), dp(6), dp(12), dp(6));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        params.setMargins(dp(3), 0, dp(3), 0);
+        button.setLayoutParams(params);
         button.setOnClickListener(listener);
         return button;
     }
