@@ -64,7 +64,7 @@ public class ProjectManager {
 
         EntityData light = new EntityData("light");
         light.setOrigin(0, 0, 160);
-        light.setKey("light", "300");
+        light.setKey("_light", "300");
         map.entities.add(light);
 
         return map;

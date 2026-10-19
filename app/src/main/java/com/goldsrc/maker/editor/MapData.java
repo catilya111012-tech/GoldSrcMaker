@@ -10,6 +10,7 @@ import java.util.List;
 public class MapData {
 
     public final List<Brush> brushes = new ArrayList<>();
+    public final List<BrushEntity> brushEntities = new ArrayList<>();
     public final List<EntityData> entities = new ArrayList<>();
 
     public String toMapText(String wadAbsolutePath) {
@@ -30,6 +31,9 @@ public class MapData {
             brush.appendMapText(builder);
         }
         builder.append("}\n");
+        for (BrushEntity brushEntity : brushEntities) {
+            brushEntity.appendMapText(builder);
+        }
         for (EntityData entity : entities) {
             entity.appendMapText(builder);
         }
@@ -50,6 +54,11 @@ public class MapData {
             brushArray.put(brush.toJson());
         }
         root.put("brushes", brushArray);
+        JSONArray brushEntityArray = new JSONArray();
+        for (BrushEntity brushEntity : brushEntities) {
+            brushEntityArray.put(brushEntity.toJson());
+        }
+        root.put("brushEntities", brushEntityArray);
         JSONArray entityArray = new JSONArray();
         for (EntityData entity : entities) {
             entityArray.put(entity.toJson());
@@ -66,6 +75,12 @@ public class MapData {
                 map.brushes.add(Brush.fromJson(brushArray.getJSONObject(i)));
             }
         }
+        JSONArray brushEntityArray = root.optJSONArray("brushEntities");
+        if (brushEntityArray != null) {
+            for (int i = 0; i < brushEntityArray.length(); i++) {
+                map.brushEntities.add(BrushEntity.fromJson(brushEntityArray.getJSONObject(i)));
+            }
+        }
         JSONArray entityArray = root.optJSONArray("entities");
         if (entityArray != null) {
             for (int i = 0; i < entityArray.length(); i++) {
@@ -79,6 +94,9 @@ public class MapData {
         MapData copy = new MapData();
         for (Brush brush : brushes) {
             copy.brushes.add(brush.copy());
+        }
+        for (BrushEntity brushEntity : brushEntities) {
+            copy.brushEntities.add(brushEntity.copy());
         }
         for (EntityData entity : entities) {
             copy.entities.add(entity.copy());

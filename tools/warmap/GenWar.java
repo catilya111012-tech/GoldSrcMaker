@@ -4,6 +4,7 @@ import com.goldsrc.maker.core.TextureImage;
 import com.goldsrc.maker.core.TextureStore;
 import com.goldsrc.maker.core.WadWriter;
 import com.goldsrc.maker.editor.Brush;
+import com.goldsrc.maker.editor.BrushEntity;
 import com.goldsrc.maker.editor.EntityData;
 import com.goldsrc.maker.editor.MapData;
 import com.goldsrc.maker.scripting.BlockGraph;
@@ -41,7 +42,9 @@ public class GenWar {
         writeProject(projectDir);
         verify(projectDir);
 
-        System.out.println("брашей: " + map.brushes.size() + ", энтити: " + map.entities.size());
+        System.out.println("брашей: " + map.brushes.size()
+                + ", brush-энтити: " + map.brushEntities.size()
+                + ", энтити: " + map.entities.size());
         if (failed > 0) {
             System.out.println("ПРОВАЛЕНО ПРОВЕРОК: " + failed);
             System.exit(1);
@@ -69,17 +72,17 @@ public class GenWar {
     }
 
     private static void buildMap() {
-        // земля и дорога
-        box(-512, -512, -16, -94, 512, 0, "WARGROUND");
-        box(-96, -512, -16, 96, 512, 2, "WARGROAD");
-        box(94, -512, -16, 512, 512, 0, "WARGROUND");
+        // земля и дорога (до самой северной зоны с окопами)
+        box(-512, -512, -16, -94, 1408, 0, "WARGROUND");
+        box(-96, -512, -16, 96, 1408, 2, "WARGROAD");
+        box(94, -512, -16, 512, 1408, 0, "WARGROUND");
 
-        // периметр
+        // периметр (северная стена отодвинута под окопы)
         box(-512, -512, -16, 512, -464, 480, "WARCONC");
-        box(-512, 464, -16, 512, 512, 480, "WARCONC");
-        box(-512, -512, -16, -464, 512, 480, "WARCONC");
-        box(464, -512, -16, 512, 512, 480, "WARCONC");
-        box(-560, -560, 448, 560, 560, 480, "SKY");
+        box(-512, 1360, -16, 512, 1408, 480, "WARCONC");
+        box(-512, -512, -16, -464, 1408, 480, "WARCONC");
+        box(464, -512, -16, 512, 1408, 480, "WARCONC");
+        box(-560, -560, 448, 560, 1408, 480, "SKY");
 
         // казарма (запад), дверь в восточной стене y 8..56
         box(-448, -96, -16, -424, 160, 192, "WARCAMO");
@@ -97,8 +100,9 @@ public class GenWar {
         box(200, 72, -16, 424, 96, 192, "WARBRICK");
         box(176, -160, 160, 448, 96, 192, "WARCONC");
 
-        // бункер (север), дверь в южной стене x -24..24
-        box(-176, 416, -16, 176, 448, 224, "WARCONC");
+        // бункер (север), южная дверь x -24..24, северный проход x -48..48 → окопы
+        box(-176, 416, -16, -48, 448, 224, "WARCONC");
+        box(48, 416, -16, 176, 448, 224, "WARCONC");
         box(-176, 256, -16, -24, 288, 224, "WARCONC");
         box(24, 256, -16, 176, 288, 224, "WARCONC");
         box(-176, 288, -16, -144, 416, 224, "WARCONC");
@@ -121,6 +125,39 @@ public class GenWar {
         box(-448, 288, -8, -224, 304, 48, "WARCONC");
         box(224, 176, -8, 448, 192, 48, "WARCONC");
 
+        // === окопы: две линии земляных валов севернее бункера ===
+        // первая линия: южный вал y 704..736 (проход-зигзаг x -336..-272) и
+        // северный вал y 800..832 (проход x 272..336); дорога проходит насквозь
+        box(-448, 704, -16, -336, 736, 88, "WARSANDB");
+        box(-272, 704, -16, -96, 736, 88, "WARSANDB");
+        box(96, 704, -16, 448, 736, 88, "WARSANDB");
+        box(-448, 800, -16, -96, 832, 88, "WARSANDB");
+        box(96, 800, -16, 272, 832, 88, "WARSANDB");
+        box(336, 800, -16, 448, 832, 88, "WARSANDB");
+
+        // укрытия и припасы в самом окопе
+        box(-192, 744, -8, -128, 776, 48, "WARCONC");
+        box(128, 744, -8, 192, 776, 48, "WARCONC");
+        crate(-64, 768, -8);
+        crate(64, 768, -8);
+
+        // вторая линия: вал y 1152..1184 (проходы: дорога и фланг x 160..224)
+        box(-448, 1152, -16, -96, 1184, 88, "WARSANDB");
+        box(96, 1152, -16, 160, 1184, 88, "WARSANDB");
+        box(224, 1152, -16, 448, 1184, 88, "WARSANDB");
+
+        // бетонные блоки и ящики в поле
+        box(-384, 944, -8, -256, 960, 48, "WARCONC");
+        box(256, 1008, -8, 384, 1024, 48, "WARCONC");
+        crate(-136, 880, -8);
+        crate(136, 880, -8);
+
+        // штаб врага: мешки перед северной стеной
+        box(-192, 1280, -8, 192, 1312, 48, "WARSANDB");
+        crate(-96, 1248, -8);
+        crate(96, 1248, -8);
+        crate(0, 1332, -8);
+
         // ящики
         crate(-136, -152, -8);
         crate(-104, -152, -8);
@@ -141,8 +178,18 @@ public class GenWar {
         crate(-160, -336, 0);
         crate(160, -336, 0);
 
+        // бронедверь на север: уезжает на восток в стену-пенал
+        // (angle 0 = +X; ход = (136-2)-8 = 126, открытая прячется в стене x 48..224)
+        BrushEntity blastDoor = new BrushEntity("func_door");
+        blastDoor.setKey("angle", "0");
+        blastDoor.setKey("speed", "100");
+        blastDoor.setKey("wait", "-1");
+        blastDoor.setKey("lip", "8");
+        blastDoor.brushes.add(new Brush(-48, -289, 0, 88, -255, 194, "WARMETAL"));
+        map.brushEntities.add(blastDoor);
+
         // свет неба
-        ent("light_environment", 0, 320, 430, "pitch", "-90", "light", "300",
+        ent("light_environment", 0, 320, 430, "pitch", "-90",
                 "_light", "170 180 200 350");
 
         // старт игрока: оружейная (без врагов)
@@ -159,9 +206,9 @@ public class GenWar {
         ent("item_healthkit", -48, -368, 8);
         ent("ammo_9mmclip", -160, -336, 40);
         ent("ammo_buckshot", 160, -336, 40);
-        ent("light", 0, -360, 150, "light", "300");
-        ent("light", -128, -440, 140, "light", "220");
-        ent("light", 128, -440, 140, "light", "220");
+        ent("light", 0, -360, 150, "_light", "300");
+        ent("light", -128, -440, 140, "_light", "220");
+        ent("light", 128, -440, 140, "_light", "220");
 
         // улица: припасы за мешками
         ent("weapon_9mmAR", -88, -240, 8);
@@ -170,7 +217,7 @@ public class GenWar {
         ent("weapon_handgrenade", 96, -240, 8);
         ent("ammo_ARgrenades", 120, -240, 8);
         ent("item_battery", 0, -352, 8);
-        ent("light", 0, -320, 160, "light", "280");
+        ent("light", 0, -320, 160, "_light", "280");
         ent("item_healthkit", 0, -96, 8);
 
         // первая линия HECU (спиной к спавну, чтобы не расстреливали сразу)
@@ -198,19 +245,19 @@ public class GenWar {
         ent("weapon_handgrenade", -288, -48, 8);
         ent("item_healthkit", -352, 96, 8);
         ent("item_battery", -288, 96, 8);
-        ent("light", -312, 32, 140, "light", "300");
+        ent("light", -312, 32, 140, "_light", "300");
 
         // дом: засада
         ent("monster_human_grunt", 288, -96, 8, "angle", "270");
         ent("monster_human_grunt", 320, -32, 8, "angle", "180");
         ent("ammo_9mmAR", 288, -64, 8);
         ent("weapon_9mmhandgun", 352, 32, 8);
-        ent("light", 312, -32, 140, "light", "300");
+        ent("light", 312, -32, 140, "_light", "300");
 
         // вторая линия у бункера
         ent("monster_human_grunt", -96, 224, 8, "angle", "270", "weapons", "3");
         ent("monster_human_grunt", 96, 224, 8, "angle", "270", "weapons", "3");
-        ent("light", 0, 144, 160, "light", "280");
+        ent("light", 0, 144, 160, "_light", "280");
 
         // бункер: РПГ и припасы
         ent("weapon_rpg", 0, 352, 8);
@@ -218,12 +265,46 @@ public class GenWar {
         ent("ammo_rpgclip", 64, 352, 8);
         ent("item_healthkit", 96, 352, 8);
         ent("item_battery", -96, 352, 8);
-        ent("light", 0, 352, 170, "light", "350");
+        ent("light", 0, 352, 170, "_light", "350");
 
         // снайперы и командир на крыше
         ent("monster_human_grunt", -96, 352, 236, "angle", "270", "weapons", "1");
         ent("monster_human_grunt", 96, 352, 236, "angle", "270", "weapons", "1");
         ent("monster_human_assassin", 0, 352, 236, "angle", "270", "targetname", "boss");
+
+        // === окопы: наши — отряд охранников держит первую линию ===
+        ent("monster_barney", -320, 768, 8, "angle", "270");
+        ent("monster_barney", -224, 768, 8, "angle", "270");
+        ent("monster_barney", -48, 768, 8, "angle", "270");
+        ent("monster_barney", 48, 768, 8, "angle", "270");
+        ent("monster_barney", 224, 768, 8, "angle", "270");
+        ent("monster_barney", 320, 768, 8, "angle", "270");
+        ent("item_healthkit", -176, 768, 8);
+        ent("ammo_9mmAR", 176, 768, 8);
+        ent("ammo_buckshot", 0, 768, 8);
+
+        // противник в нейтральной полосе
+        ent("monster_human_grunt", -288, 880, 8, "angle", "180", "weapons", "2");
+        ent("monster_human_grunt", 0, 880, 8, "angle", "180", "weapons", "2");
+        ent("monster_human_grunt", 288, 880, 8, "angle", "180", "weapons", "2");
+
+        // вторая линия обороны врага
+        ent("monster_human_grunt", -320, 1120, 8, "angle", "180", "weapons", "1");
+        ent("monster_human_grunt", -96, 1120, 8, "angle", "180", "weapons", "0");
+        ent("monster_human_grunt", 96, 1120, 8, "angle", "180", "weapons", "0");
+        ent("monster_human_grunt", 320, 1120, 8, "angle", "180", "weapons", "3");
+        ent("ammo_ARgrenades", 0, 1104, 8);
+        ent("item_battery", -160, 1200, 8);
+        ent("item_healthkit", 0, 1200, 8);
+        ent("ammo_rpgclip", 160, 1200, 8);
+
+        // штаб: охрана и командир (warlord) за мешками
+        ent("monster_human_grunt", -128, 1224, 8, "angle", "180", "weapons", "1");
+        ent("monster_human_grunt", 128, 1224, 8, "angle", "180", "weapons", "2");
+        ent("monster_human_assassin", -48, 1340, 8, "angle", "180", "targetname", "warlord");
+        ent("monster_human_assassin", 48, 1340, 8, "angle", "180");
+        ent("weapon_shotgun", -160, 1224, 8);
+        ent("ammo_buckshot", -192, 1224, 8);
     }
 
     // ------------------------------------------------------------- текстуры
@@ -384,22 +465,28 @@ public class GenWar {
 
         BlockNode start = graph.addNode(BlockType.ON_MAP_START, 40, 40);
         BlockNode welcome = graph.addNode(BlockType.ACTION_SHOW_MESSAGE, 40, 180);
-        welcome.setParam("text", "Оружейная: возьми снаряжение. За дверью на севере — деревня с HECU.");
+        welcome.setParam("text", "Оружейная: возьми снаряжение. Бронедверь открывается от касания — за ней деревня с HECU.");
         BlockNode pause = graph.addNode(BlockType.ACTION_DELAY, 40, 320);
         pause.setParam("seconds", "4");
         BlockNode hint = graph.addNode(BlockType.ACTION_SHOW_MESSAGE, 40, 460);
-        hint.setParam("text", "Бери дробовик, MP5 и гранаты. Берегись стрелков на крыше бункера!");
+        hint.setParam("text", "Бери дробовик, MP5 и гранаты. За бункером на севере — окопы: там держат оборону наши!");
 
         BlockNode bossDead = graph.addNode(BlockType.ON_ENTITY_DEATH, 400, 40);
         bossDead.setParam("target", "boss");
-        BlockNode victory = graph.addNode(BlockType.ACTION_SHOW_MESSAGE, 400, 180);
-        victory.setParam("text", "Командир уничтожен! Деревня наша. Победа!");
-        BlockNode done = graph.addNode(BlockType.ACTION_END, 400, 320);
+        BlockNode villageDone = graph.addNode(BlockType.ACTION_SHOW_MESSAGE, 400, 180);
+        villageDone.setParam("text", "Деревня зачищена! Прорывайся через бункер на север — в окопах идёт бойня.");
+
+        BlockNode warlordDead = graph.addNode(BlockType.ON_ENTITY_DEATH, 760, 40);
+        warlordDead.setParam("target", "warlord");
+        BlockNode victory = graph.addNode(BlockType.ACTION_SHOW_MESSAGE, 760, 180);
+        victory.setParam("text", "Командир окопов уничтожен — бойня выиграна! Победа!");
+        BlockNode done = graph.addNode(BlockType.ACTION_END, 760, 320);
 
         start.nextId = welcome.id;
         welcome.nextId = pause.id;
         pause.nextId = hint.id;
-        bossDead.nextId = victory.id;
+        bossDead.nextId = villageDone.id;
+        warlordDead.nextId = victory.id;
         victory.nextId = done.id;
         return graph;
     }
@@ -443,6 +530,9 @@ public class GenWar {
         MapData reload = MapData.fromJson(new JSONObject(readText(new File(dir, "map.json"))));
         check(reload.brushes.size() == map.brushes.size(),
                 "map.json: брашей " + reload.brushes.size() + " из " + map.brushes.size());
+        check(reload.brushEntities.size() == map.brushEntities.size(),
+                "map.json: brush-энтити " + reload.brushEntities.size()
+                        + " из " + map.brushEntities.size());
         check(reload.entities.size() == map.entities.size(),
                 "map.json: энтити " + reload.entities.size() + " из " + map.entities.size());
         boolean allValid = true;
@@ -478,7 +568,7 @@ public class GenWar {
                 "модели war_crate и war_barrel читаются");
 
         BlockGraph graph = BlockGraph.fromJson(new JSONObject(readText(new File(dir, "graph.json"))));
-        check(graph.nodes.size() == 7, "graph.json: узлов " + graph.nodes.size());
+        check(graph.nodes.size() == 9, "graph.json: узлов " + graph.nodes.size());
         String script = readText(new File(dir, "main.angelscript"));
         check(script.contains("gs_block_"), "main.angelscript содержит блоки");
 
@@ -487,11 +577,25 @@ public class GenWar {
         check(mapText.contains("halflife.wad;") && mapText.contains("textures.wad"),
                 "main.map: оба WAD в worldspawn");
         int faceLines = countOccurrences(mapText, " 0 1 1\n");
-        check(faceLines == map.brushes.size() * 6,
-                "main.map: граней " + faceLines + " (ожидалось " + (map.brushes.size() * 6) + ")");
+        int brushEntityFaces = 0;
+        for (BrushEntity brushEntity : reload.brushEntities) {
+            brushEntityFaces += brushEntity.brushes.size() * 6;
+        }
+        int expectedFaces = map.brushes.size() * 6 + brushEntityFaces;
+        check(faceLines == expectedFaces,
+                "main.map: граней " + faceLines + " (ожидалось " + expectedFaces + ")");
         check(mapText.contains("\"classname\" \"monster_human_grunt\""),
                 "main.map: солдаты HECU на месте");
         check(mapText.contains("\"targetname\" \"boss\""), "main.map: командир на месте");
+        check(mapText.contains("\"targetname\" \"warlord\""), "main.map: командир окопов на месте");
+        check(countOccurrences(mapText, "\"classname\" \"monster_barney\"") >= 7,
+                "main.map: отряд наших в окопах (Барни)");
+        check(mapText.contains("\"classname\" \"func_door\""), "main.map: func_door на месте");
+        check(mapText.contains("\"wait\" \"-1\""), "main.map: дверь не закрывается сама");
+        check(!mapText.contains("\"light\" \""),
+                "main.map: устаревшего ключа light нет (все лампы на _light)");
+        check(mapText.contains("\"_light\" \"300\"") && mapText.contains("\"_light\" \"220\""),
+                "main.map: яркости ламп на месте");
     }
 
     private static int countOccurrences(String text, String needle) {

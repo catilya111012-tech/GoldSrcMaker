@@ -17,6 +17,7 @@ javac -encoding UTF-8 -d "$OUT" \
   "$APP_SRC"/com/goldsrc/maker/scripting/CodeGenerator.java \
   "$APP_SRC"/com/goldsrc/maker/scripting/ScriptSimulator.java \
   "$APP_SRC"/com/goldsrc/maker/editor/Brush.java \
+  "$APP_SRC"/com/goldsrc/maker/editor/BrushEntity.java \
   "$APP_SRC"/com/goldsrc/maker/editor/EntityData.java \
   "$APP_SRC"/com/goldsrc/maker/editor/EntityCatalog.java \
   "$APP_SRC"/com/goldsrc/maker/editor/MapData.java \

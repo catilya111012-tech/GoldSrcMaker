@@ -62,15 +62,15 @@ public final class EntityCatalog {
                 .field("targetname", "Имя (targetname)"));
 
         register("light", "Источник света", new ClassDef("Точечный свет. Яркость 100..500, цвета можно не задавать.")
-                .number("light", "Яркость (light)")
+                .number("_light", "Яркость (light)")
                 .field("_color", "Цвет R G B (опц.)")
-                .def("light", "300"));
+                .def("_light", "300"));
 
         register("light_environment", "Свет неба", new ClassDef("Направленный свет от неба (обычно один на карту).")
-                .number("light", "Яркость (light)")
+                .number("_light", "Яркость (light)")
                 .number("pitch", "Pitch (обычно -90)")
                 .field("_color", "Цвет R G B (опц.)")
-                .def("light", "300")
+                .def("_light", "300")
                 .def("pitch", "-90"));
 
         register("ambient_generic", "Звук", new ClassDef("Зацикленный или триггерный звук.")

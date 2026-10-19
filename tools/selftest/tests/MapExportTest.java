@@ -1,6 +1,9 @@
 import com.goldsrc.maker.editor.Brush;
+import com.goldsrc.maker.editor.BrushEntity;
 import com.goldsrc.maker.editor.EntityData;
 import com.goldsrc.maker.editor.MapData;
+
+import org.json.JSONObject;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -84,6 +87,39 @@ public class MapExportTest {
         expected.add("0,0,1");
         expected.add("0,0,-1");
         check(normals.equals(expected), "нормали всех 6 фейсов смотрят наружу: " + normals);
+
+        BrushEntity door = new BrushEntity("func_door");
+        door.setKey("angle", "-1");
+        door.setKey("speed", "80");
+        door.setKey("wait", "-1");
+        door.setKey("lip", "16");
+        door.brushes.add(new Brush(-48, -288, 0, 48, -256, 208, "WARMETAL"));
+        map.brushEntities.add(door);
+
+        String withDoor = map.toMapText("/valve/halflife.wad");
+        check(withDoor.contains("\"classname\" \"func_door\""), "brush-энтити func_door попадает в .map");
+        check(withDoor.contains("\"angle\" \"-1\""), "ключ angle двери в .map");
+        check(withDoor.contains("\"wait\" \"-1\""), "ключ wait двери в .map");
+        check(withDoor.indexOf("\"classname\" \"func_door\"")
+                        > withDoor.indexOf("\"mapversion\" \"220\""),
+                "brush-энтити идёт после worldspawn");
+        int doorFaces = countOccurrences(withDoor, " ) ( ");
+        check(doorFaces == 24, "маркеры фейсов world+door брашей (6+6 фейсов × 2): " + doorFaces);
+
+        JSONObject json = map.toJson();
+        MapData restored = MapData.fromJson(json);
+        check(restored.brushEntities.size() == 1, "brushEntities переживают JSON");
+        check("func_door".equals(restored.brushEntities.get(0).classname), "classname переживает JSON");
+        check("-1".equals(restored.brushEntities.get(0).getKey("angle")), "ключи переживают JSON");
+        check(restored.brushEntities.get(0).brushes.size() == 1, "браши энтити переживают JSON");
+        check(withDoor.equals(restored.toMapText("/valve/halflife.wad")),
+                "текст .map после JSON-roundtrip совпадает");
+
+        MapData copied = map.copy();
+        check(copied.brushEntities.size() == 1
+                        && copied.brushEntities.get(0).brushes.size() == 1,
+                "copy() копирует brush-энтити");
+        check(withDoor.equals(copied.toMapText("/valve/halflife.wad")), "copy() не теряет дверь");
 
         if (failures == 0) {
             System.out.println("ALL MAP TESTS PASSED");

@@ -65,8 +65,8 @@ public class EntityCatalogTest {
         check(noOriginDefaults, "каталог не задаёт origin в defaults (позицию ставит редактор)");
         check(allHaveTargetname, "у gameplay-классов есть поле targetname");
 
-        check("300".equals(EntityCatalog.defaults("light").get("light")),
-                "у light яркость по умолчанию 300");
+        check("300".equals(EntityCatalog.defaults("light").get("_light")),
+                "у light яркость по умолчанию 300 (ключ _light для VHLT)");
         check("0".equals(EntityCatalog.defaults("info_player_start").get("angles")),
                 "у info_player_start angles по умолчанию 0");
         check(!EntityCatalog.defaults("light").containsKey("targetname"),
@@ -83,14 +83,14 @@ public class EntityCatalogTest {
         boolean lightNumeric = false;
         boolean targetnameText = false;
         for (EntityCatalog.FieldSpec spec : EntityCatalog.fields("light")) {
-            if ("light".equals(spec.key)) {
+            if ("_light".equals(spec.key)) {
                 lightNumeric = spec.numeric;
             }
             if ("targetname".equals(spec.key)) {
                 targetnameText = !spec.numeric;
             }
         }
-        check(lightNumeric, "поле light помечено числовым");
+        check(lightNumeric, "поле _light помечено числовым");
         check(targetnameText, "поле targetname — строковое");
 
         check(EntityCatalog.title("light").toLowerCase().contains("свет"),
@@ -105,7 +105,8 @@ public class EntityCatalogTest {
         entity.appendMapText(map);
         String text = map.toString();
         check(text.contains("\"classname\" \"light\""), "light пишется в .map как classname light");
-        check(text.contains("\"light\" \"300\""), "яркость 300 попадает в .map");
+        check(text.contains("\"light\" \"300\"") == false, "старый ключ light не пишется");
+        check(text.contains("\"_light\" \"300\""), "яркость 300 попадает в .map как _light");
         check(text.contains("\"origin\" \"64 128 24\""), "origin попадает в .map");
 
         if (failed > 0) {
